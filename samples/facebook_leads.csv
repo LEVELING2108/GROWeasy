@@ -1,0 +1,5 @@
+created_time,full_name,email_address,phone_number,company_name,city_name,notes,campaign_name,possession
+2026-06-01 10:30:15,David Miller,david.m@example.com,+1 415 555 2671,Capital LLC,San Francisco,Wants to reschedule call,leads_on_demand,Immediate
+2026-06-01 11:15:22,Alice Smith,alice.s@example.com; alice.alt@example.com,+1 415 555 1234,Innovate Tech,Oakland,Alt Phone: +1 415 555 5678,meridian_tower,
+2026-06-01 12:00:00,Invalid Lead,,,Missing email and phone,San Jose,Should be skipped,,
+2026-06-01 13:45:00,Raj Kumar,raj.kumar@gmail.com,+91 99999 88888,Retail Corp,New Delhi,Interested in premium plan,varah_swamy,Dec 2026

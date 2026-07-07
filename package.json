@@ -1,0 +1,17 @@
+{
+  "name": "groweasy-csv-importer",
+  "version": "1.0.0",
+  "description": "AI-powered CSV Importer for CRM Leads - GrowEasy Assignment",
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "npx concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm start"
+  },
+  "private": true,
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
