@@ -129,3 +129,35 @@ The backend and Gemini prompts enforce the following target schema:
 | `crm_note` | Remarks & Extras | Consolidated secondary numbers, secondary emails, and raw comments |
 | `possession_time` | Property possession time | Captured if available |
 | `description` | Extra lead description | General details |
+
+---
+
+## 🌐 Deployment Guide
+
+This project is fully prepared for one-click deployment to cloud platforms. Since the codebase is structured as separate backend and frontend projects, follow these instructions to go live.
+
+### 1. Backend Deployment (Render or Railway)
+Deploy the Node/Express server on **Render** (free web service) or **Railway**:
+
+1. Log in to [Render](https://render.com/) or [Railway](https://railway.app/) and create a new project connected to your GitHub repository.
+2. Set the root directory to `backend`.
+3. Set the build command to `npm install` and start command to `npm start`.
+4. Configure the following environment variables:
+   * `PORT`: `5000` (or leave it to automatically set by the platform).
+   * `GEMINI_API_KEY`: `your-actual-api-key` (to activate the AI mapping feature).
+   * `FRONTEND_URL`: `https://your-frontend-app.vercel.app` (points to your deployed Vercel URL to secure CORS).
+   
+> 📁 **Note on Persistence**: By default, leads are saved locally to `backend/leads_db.json`. On free ephemeral containers (like Render), files are reset when the container sleeps. To persist leads across restarts on Render, you can mount a [Render Disk](https://render.com/docs/disks) to `/opt/render/project/src/backend` or simply migrate to a real database client.
+
+---
+
+### 2. Frontend Deployment (Vercel)
+Deploy the Next.js frontend on **Vercel**:
+
+1. Log in to [Vercel](https://vercel.com/) and import your project from GitHub.
+2. Vercel will auto-detect Next.js. Set the **Root Directory** settings to `frontend`.
+3. Configure the following Environment Variable:
+   * `NEXT_PUBLIC_API_URL`: `https://your-backend-app.onrender.com` (points to your deployed Render/Railway backend URL).
+4. Click **Deploy**.
+
+Once both are live, your frontend will securely call the AI CSV importer backend, standardizing lead lists in real-time!
