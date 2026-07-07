@@ -627,6 +627,19 @@ app.get('/api/health', (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`GrowEasy Backend listening at http://localhost:${port}`);
-});
+let server;
+if (process.env.NODE_ENV !== 'test') {
+  server = app.listen(port, () => {
+    console.log(`GrowEasy Backend listening at http://localhost:${port}`);
+  });
+}
+
+// Export modules for unit testing
+if (process.env.NODE_ENV === 'test') {
+  module.exports = {
+    app,
+    isLeadMatch,
+    loadLeadsFromDatabase,
+    saveLeadsToDatabase
+  };
+}
