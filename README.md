@@ -15,18 +15,6 @@ This repository contains both a responsive **Next.js Frontend** and a **Node.js 
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
 </p>
 
----
-
-## 📷 Screenshots
-
-### 1. Lead Sources Overview
-![Lead Sources Overview](./assets/screenshot1.png)
-
-### 2. CSV Import Wizard
-![CSV Import Wizard](./assets/screenshot2.png)
-
-### 3. Lead Management Dashboard
-![Lead Management Dashboard](./assets/screenshot3.png)
 
 ---
 
