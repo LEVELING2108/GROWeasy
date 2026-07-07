@@ -141,12 +141,3 @@ The backend and Gemini prompts enforce the following target schema:
 | `crm_note` | Remarks & Extras | Consolidated secondary numbers, secondary emails, and raw comments |
 | `possession_time` | Property possession time | Captured if available |
 | `description` | Extra lead description | General details |
-
----
-
-## 🎯 Submission Checklist
-
-- **Hosted application URL**: [To be deployed by user]
-- **GitHub repository URL**: https://github.com/LEVELING2108/GROWeasy.git
-- **Position applied for**: Software Developer (Intern / Full-Time)
-- **Submit to**: `varun@groweasy.ai`
