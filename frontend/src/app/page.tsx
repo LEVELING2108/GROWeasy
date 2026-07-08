@@ -159,28 +159,31 @@ export default function CSVImporterPage() {
     }
   }, []);
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Load fresh leads from the backend
+  const fetchLeads = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await fetch(`${API_URL}/api/leads`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.records) {
+          setLeads(data.records);
+          localStorage.setItem('groweasy_leads', JSON.stringify(data.records));
+        }
+      }
+    } catch (err) {
+      console.warn('Backend fetch failed, relying on cached localStorage leads:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
   // Load fresh leads from the backend on mount
   useEffect(() => {
-    let active = true;
-    const fetchLeads = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/leads`);
-        if (res.ok) {
-          const data = await res.json();
-          if (active && data.success && data.records) {
-            setLeads(data.records);
-            localStorage.setItem('groweasy_leads', JSON.stringify(data.records));
-          }
-        }
-      } catch (err) {
-        console.warn('Backend fetch failed, relying on cached localStorage leads:', err);
-      }
-    };
     fetchLeads();
-    return () => {
-      active = false;
-    };
-  }, []);
+  }, [fetchLeads]);
 
   // Sync leads to localStorage whenever state changes
   useEffect(() => {
@@ -671,8 +674,17 @@ export default function CSVImporterPage() {
                     />
                     <Search size={14} className="search-icon" />
                   </div>
-                  <button className="btn btn-secondary btn-icon" onClick={() => setSearchQuery('')} title="Reset">
-                    <RefreshCw size={14} />
+                  <button 
+                    className="btn btn-secondary btn-icon" 
+                    onClick={() => {
+                      setSearchQuery('');
+                      setStatusFilter('ALL');
+                      fetchLeads();
+                    }} 
+                    disabled={isRefreshing}
+                    title="Reset & Refresh"
+                  >
+                    <RefreshCw size={14} className={isRefreshing ? 'animate-spin-one' : ''} />
                   </button>
                   <button className="btn btn-secondary btn-icon" onClick={exportLeadsCSV} title="Export CSV">
                     <Download size={14} />

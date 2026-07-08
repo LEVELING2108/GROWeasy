@@ -1352,3 +1352,11 @@ h1, h2, h3, h4, h5, h6 {
   --error-tint-border: rgba(220, 38, 38, 0.3);
   --error-text: #f87171;
 }
+
+.animate-spin-one {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
