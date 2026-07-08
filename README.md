@@ -1,163 +1,175 @@
-# GrowEasy AI-Powered CSV CRM Importer
+# GrowEasy CRM Lead Importer
 
-An intelligent CSV Importer built to extract and standardize CRM lead details from any arbitrary CSV structure using Google Gemini AI. 
+An intelligent, AI-powered CSV importer built to standardize arbitrary CRM lead spreadsheets into GrowEasy's unified schema using Google Gemini.
 
-This repository contains both a responsive **Next.js Frontend** and a **Node.js Express Backend** that maps raw column attributes to standard GrowEasy CRM fields.
+## Overview
+- **Problem Statement:** Standardizing lead sheets exported from various marketing channels (Facebook Ads, Google Ads, raw Excel sheets, Real Estate CRMs) into a single, unified CRM database. 
+- **Why this is hard:** It is not about simply parsing CSV files; it is about semantic field mapping. Raw columns have dynamic, messy, or ambiguous headers (e.g., "Full Name", "Lead Name", "first_name", "phone", "contact_no") and unstructured values that require context-aware mapping rather than basic string-matching algorithms.
 
-<p align="left">
-  <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
-  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
-  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white" alt="CSS3" />
-  <img src="https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js" />
-  <img src="https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express.js" />
-  <img src="https://img.shields.io/badge/Google%20Gemini-8E75C2?style=for-the-badge&logo=googlegemini&logoColor=white" alt="Google Gemini" />
-  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
-</p>
+## Live Demo
+- **Hosted URL:** `https://[YOUR_VERCEL_APP_URL].vercel.app` *(Update this with your Vercel deployment link)*
+- **GitHub Repo:** `https://github.com/LEVELING2108/GROWeasy.git`
+- **Hosted Backend URL:** `https://groweasy-backend-a7il.onrender.com`
 
+## Features
+- **Drag & drop CSV upload:** Plus standard file picker supporting up to 5MB files.
+- **No-AI preview step:** Local parsing via PapaParse displays a preview table instantly to keep UI responsive and save API costs.
+- **Confirm-to-import flow:** Let users inspect data column headers before calling the backend.
+- **AI-powered field mapping (batched):** Uses `gemini-2.0-flash` with JSON schema enforcement, batching records in groups of 10 to speed up execution.
+- **Results view:** Shows total imported vs skipped lead counts, success records table, and skipped lead cards detailing reasons (e.g., missing contact details).
+- **Simulation Fallback Mode:** Operates out-of-the-box using deterministic matching if no Gemini API key is configured.
+- **Dark Mode Support:** Clean, modern, responsive glassmorphic dashboard theme with system preferences local storage sync.
 
----
+## Tech Stack
+- **Frontend:** Next.js 16 (App Router), React 19, TypeScript, Vanilla CSS, Lucide Icons, PapaParse.
+- **Backend:** Node.js, Express, Multer, `@google/genai` (Official Google Gemini SDK).
+- **AI:** Google Gemini (`gemini-2.0-flash`) in strict JSON schema mode.
+- **Database:** Local JSON database file (`backend/leads_db.json`) equipped with robust read/write queueing and lead deduplication rules.
 
-## 🌟 Key Features
-
-- **Messy Data Resilience**: Handles exports from Facebook Ads, Google Ads, arbitrary Excel sheets, and custom CRMs, mapping field variations (e.g., "Full Name", "Lead Name", "first_name", "phone", "contact") to the standard CRM schema.
-- **Modern Glassmorphic UI**: Beautiful dark-mode dashboard themed around GrowEasy's palette, utilizing responsive styling, clean layouts, and smooth animations.
-- **Client-Side CSV Preview**: Fast local parsing (using PapaParse) and table previews with scrollbars and sticky headers prior to any AI execution.
-- **Intelligent LLM Batching**: Sends lead batches to Gemini (`gemini-2.0-flash`) using JSON schema modes to ensure high speed, structured responses, and strict compliance with CRM constraints.
-- **Enforced CRM Schemas**:
-  - **Standardized Statuses**: Classifies raw statuses into `GOOD_LEAD_FOLLOW_UP`, `DID_NOT_CONNECT`, `BAD_LEAD`, or `SALE_DONE`.
-  - **Standardized Data Sources**: Restricts origins to allowed listings (`leads_on_demand`, `meridian_tower`, `eden_park`, etc.).
-  - **Valid Dates**: Enforces JS `Date`-compatible formats for `created_at`.
-  - **Information Consolidation**: Collects remarks, secondary emails, and alternate phone numbers directly into `crm_note`.
-  - **Validation Filtering**: Safely skips records that lack both an email and a phone number.
-- **Actionable Results & Exporting**: Highlights metrics, successfully mapped records, and skipped rows, with immediate download capabilities as **CSV** or **JSON**.
-- **Simulation Fallback Mode**: If no Gemini API key is supplied, the backend seamlessly switches to a rule-based simulation mode so the system works instantly out-of-the-box.
-
----
-
-## 🛠️ Tech Stack
-
-- **Frontend**: Next.js 15, React 19, TypeScript, Vanilla CSS (with Geist Sans & Mono typography), Lucide Icons, PapaParse.
-- **Backend**: Node.js, Express, Multer (in-memory file handling), `@google/genai` (Official Google Gemini SDK), PapaParse, Dotenv.
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Ensure you have [Node.js](https://nodejs.org/) (v18+) and `npm` installed.
-
-### 1. Installation
-
-From the root project directory, run the workspace setup script to automatically install all dependencies for both the frontend and backend:
-
-```bash
-npm run install:all
+## Architecture
+### High-level Flow
+```text
+Upload CSV (Drag/Picker) ➔ Parse locally (PapaParse) ➔ Preview Table ➔ Confirm Upload ➔ Send to Express Backend ➔ Batch records (10 per batch) ➔ AI mapping (Gemini SDK) ➔ Post-process validation ➔ Deduplicate & Save (leads_db.json) ➔ Return JSON ➔ Display Results
 ```
 
-### 2. Environment Configuration
-
-Navigate to the `backend/` directory, duplicate the `.env.example` file to `.env`, and set your Google Gemini API key:
-
-```env
-PORT=5000
-GEMINI_API_KEY=your_gemini_api_key_here
-```
-
-> 💡 **Note**: If `GEMINI_API_KEY` is left blank, the application will run in **Simulation Mode** (deterministic header search) so you can still preview and interact with the application.
-
-### 3. Launch Development Servers
-
-Start both the frontend Next.js server (`http://localhost:3000`) and the backend Express server (`http://localhost:5000`) concurrently by running this command in the root folder:
-
-```bash
-npm run dev
-```
- 
-### 4. Running with Docker (Alternative)
-
-If you prefer to run the application in isolated Docker containers, you can boot both services concurrently using Docker Compose:
-
-```bash
-docker-compose up --build
-```
-
-The frontend will be exposed at `http://localhost:3000` and the backend at `http://localhost:5000`. Environment variables are loaded automatically from `backend/.env`.
-
----
-
-## 📂 Project Structure
-
+### Folder Structure
 ```text
 GROWeasy/
-├── assets/                   # Project screenshots & assets
-├── backend/                  # Node.js Express Backend
+├── assets/                    # Project UI screenshots
+├── backend/                   # Node.js Express backend
 │   ├── .env.example
+│   ├── leads_db.json          # Local persistence database
 │   ├── package.json
-│   └── server.js             # API handling, CSV parsing & Gemini logic
-├── frontend/                 # Next.js 15 Frontend (App Router)
+│   ├── server.js              # Express app, Gemini configuration, API routing
+│   └── server.test.js         # Backend unit tests
+├── frontend/                  # Next.js App Router frontend
+│   ├── public/
 │   ├── src/
 │   │   └── app/
-│   │       ├── globals.css   # Main CSS & custom styling utilities
-│   │       ├── layout.tsx    # Head & font definitions
-│   │       └── page.tsx      # Multi-step CSV upload & results page
+│   │       ├── globals.css    # Premium style system & animations
+│   │       ├── layout.tsx
+│   │       └── page.tsx       # Main page layout & modal upload flows
 │   ├── package.json
 │   └── tsconfig.json
-├── package.json              # Root script orchestrator
+├── docker-compose.yml         # Container build configurations
+├── render.yaml                # One-click Render Blueprint setup
+├── package.json
 └── README.md
 ```
 
----
+## CRM Schema
+The following 15 target fields are extracted and verified:
 
-## 🤖 CRM Schema Details
-
-The backend and Gemini prompts enforce the following target schema:
-
-| Field | Description | Rules / Mapping |
-|---|---|---|
-| `created_at` | Lead creation date | Enforced date string parseable by `new Date()` |
-| `name` | Lead full name | Raw name columns |
-| `email` | Primary email | First email found (extras appended to `crm_note`) |
+| Field | Description | Rules / Verification |
+| :--- | :--- | :--- |
+| `created_at` | Lead creation date | ISO Date string parseable by `new Date()` |
+| `name` | Lead full name | Raw name fields |
+| `email` | Primary email address | Standard format (extras saved to `crm_note`) |
 | `country_code` | Phone country code | Extracted country code (e.g. `+91`) |
-| `mobile_without_country_code` | Primary phone | First phone found (extras appended to `crm_note`) |
-| `company` | Company name | Mapped from employer/company tags |
-| `city` / `state` / `country` | Location | Extracted geographical components |
-| `lead_owner` | Owner email | Mapped from source owners |
-| `crm_status` | Lead standing | Standardized to: `GOOD_LEAD_FOLLOW_UP`, `DID_NOT_CONNECT`, `BAD_LEAD`, or `SALE_DONE` |
-| `data_source` | Campaign/Channel | Validated list: `leads_on_demand`, `meridian_tower`, `eden_park`, `varah_swamy`, `sarjapur_plots` |
-| `crm_note` | Remarks & Extras | Consolidated secondary numbers, secondary emails, and raw comments |
-| `possession_time` | Property possession time | Captured if available |
-| `description` | Extra lead description | General details |
+| `mobile_without_country_code` | Mobile number | Clean mobile number without country code |
+| `company` | Company name | Mapped from raw organization tags |
+| `city` | City | Extracted location components |
+| `state` | State | Extracted location components |
+| `country` | Country | Extracted location components |
+| `lead_owner` | Assigned owner email | Assigned owner tag |
+| `crm_status` | Lead standing | Restricted to allowed statuses list |
+| `crm_note` | Remarks & Consolidated extras | Append secondary phones, secondary emails, and raw comments |
+| `data_source` | Campaign channel source | Restricted to allowed source tags |
+| `possession_time` | Possession time | Property possession time details |
+| `description` | Extra lead description | General description details |
+
+### Allowed `crm_status` values:
+- `GOOD_LEAD_FOLLOW_UP`
+- `DID_NOT_CONNECT`
+- `BAD_LEAD`
+- `SALE_DONE`
+
+### Allowed `data_source` values:
+- `leads_on_demand`
+- `meridian_tower`
+- `eden_park`
+- `varah_swamy`
+- `sarjapur_plots`
 
 ---
 
-## 🌐 Deployment Guide
-
-This project is fully prepared for one-click deployment to cloud platforms. Since the codebase is structured as separate backend and frontend projects, follow these instructions to go live.
-
-### 1. Backend Deployment (Render)
-Deploy the Node/Express server on **Render** (free web service):
-
-1. Log in to [Render](https://render.com/) and create a new project connected to your GitHub repository.
-2. Set the root directory to `backend`.
-3. Set the build command to `npm install` and start command to `npm start`.
-4. Configure the following environment variables:
-   * `PORT`: `5000` (or leave it to automatically set by the platform).
-   * `GEMINI_API_KEY`: `your-actual-api-key` (to activate the AI mapping feature).
-   * `FRONTEND_URL`: `https://your-frontend-app.vercel.app` (points to your deployed Vercel URL to secure CORS).
-   
-> 📁 **Note on Persistence**: By default, leads are saved locally to `backend/leads_db.json`. On free ephemeral containers (like Render), files are reset when the container sleeps. To persist leads across restarts on Render, you can mount a [Render Disk](https://render.com/docs/disks) to `/opt/render/project/src/backend` or simply migrate to a real database client.
+## AI Mapping Rules Implemented
+- **Multiple emails/phones:** The first email/phone encountered is placed in the primary fields. Any additional email addresses or mobile numbers found are consolidated inside the `crm_note` attribute (e.g., `"Alt Mobile: 9876543210"`).
+- **Date validation:** AI parses dynamic date layouts into standard ISO format. On validation, the backend tests date parsing with `new Date(created_at)`. If it fails, it falls back to the current timestamp.
+- **Newline escaping:** Output strings are checked. Multi-line remarks or notes (e.g., inside `crm_note` or `description`) are escaped with `\n` to prevent breaking CSV rows during export.
+- **Skip logic:** Any raw record that contains **neither** an email **nor** a mobile number is automatically skipped.
 
 ---
 
-### 2. Frontend Deployment (Vercel)
-Deploy the Next.js frontend on **Vercel**:
+## Setup Instructions
 
-1. Log in to [Vercel](https://vercel.com/) and import your project from GitHub.
-2. Vercel will auto-detect Next.js. Set the **Root Directory** settings to `frontend`.
-3. Configure the following Environment Variable:
-   * `NEXT_PUBLIC_API_URL`: `https://your-backend-app.onrender.com` (points to your deployed Render backend URL).
-4. Click **Deploy**.
+### 1. Local Setup
+```bash
+# Clone the repository
+git clone https://github.com/LEVELING2108/GROWeasy.git
+cd GROWeasy
 
-Once both are live, your frontend will securely call the AI CSV importer backend, standardizing lead lists in real-time!
+# Install dependencies in root, frontend, and backend folders
+npm run install:all
+
+# Create local environment config
+cp backend/.env.example backend/.env
+
+# Start development servers
+npm run dev
+```
+
+### 2. Required Environment Variables
+Configure the following inside `backend/.env`:
+* `PORT` (Default: `5000`)
+* `GEMINI_API_KEY` (Your Google Gemini API Key)
+
+### 3. How to get a Gemini API Key
+1. Go to [Google AI Studio](https://aistudio.google.com/).
+2. Click **Create API Key**.
+3. Copy the key and paste it into `backend/.env`.
+
+---
+
+## Deployment
+
+### 1. Backend (Render)
+* We have configured a `render.yaml` file at the root.
+* Log in to **Render**, select **Blueprints**, and connect your GitHub repository.
+* Set the environment variables:
+  * `GEMINI_API_KEY`: Your Gemini API Key.
+  * `FRONTEND_URL`: Your Vercel frontend URL (e.g. `https://your-app.vercel.app`).
+* Click **Apply** to deploy the service.
+
+### 2. Frontend (Vercel)
+* Log in to **Vercel**, select **Add New Project**, and import your repository.
+* Set **Root Directory** to `frontend`.
+* Add the following environment variable:
+  * `NEXT_PUBLIC_API_URL`: Set this to your Render backend URL (e.g., `https://groweasy-backend-a7il.onrender.com`).
+* Click **Deploy**.
+* *Ensure you update `FRONTEND_URL` on Render with your final Vercel App URL to satisfy the backend CORS policy.*
+
+---
+
+## Testing
+- **Sample CSVs:** A sample CSV template and mock leads are provided in the [samples/](file:///C:/Users/suman/WebstormProjects/GROWeasy/samples) directory.
+- **How to test:** 
+  1. Open the importer modal, upload any file from the `samples/` directory, and inspect the preview.
+  2. Confirm the import to run AI mapping.
+  3. Verify statuses and columns mapping against the dashboard.
+- **Edge cases handled:** 
+  * Completely empty or malformed files (rejected with warning).
+  * Missing email and mobile (skipped with record explanation).
+  * Duplicate leads (deduplicated based on name/email/phone match).
+
+---
+
+## Known Limitations / Future Improvements
+* **Large File Optimization:** Implement a virtualized list (like `react-window`) to handle preview tables exceeding 10,000 rows without lagging.
+* **Database Integration:** Replace the local JSON database file (`leads_db.json`) with an enterprise cloud database (e.g., PostgreSQL or MongoDB) for persistent cloud deployments.
+* **Incremental Batching Streams:** Utilize server-sent events (SSE) to stream parsed results back to the frontend row-by-row instead of waiting for the full batch array call to complete.
+
+---
+
+## Submission
+- **Position Applied For:** Software Developer Intern / Software Developer (Full-Time) *(Select one)*
