@@ -35,7 +35,6 @@ Upload CSV (Drag/Picker) ➔ Parse locally (PapaParse) ➔ Preview Table ➔ Con
 ### Folder Structure
 ```text
 GROWeasy/
-├── assets/                    # Project UI screenshots
 ├── backend/                   # Node.js Express backend
 │   ├── .env.example
 │   ├── leads_db.json          # Local persistence database
