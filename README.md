@@ -2,6 +2,18 @@
 
 An intelligent, AI-powered CSV importer built to standardize arbitrary CRM lead spreadsheets into GrowEasy's unified schema using Google Gemini.
 
+<p align="left">
+  <img src="https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Node.js-43853D?style=flat-square&logo=node.js&logoColor=white" alt="Node.js" />
+  <img src="https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white" alt="Express" />
+  <img src="https://img.shields.io/badge/Google%20Gemini-8E75C2?style=flat-square&logo=googlegemini&logoColor=white" alt="Google Gemini" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white" alt="Vercel" />
+  <img src="https://img.shields.io/badge/Render-46E3B7?style=flat-square&logo=render&logoColor=white" alt="Render" />
+</p>
+
 ## Overview
 - **Problem Statement:** Standardizing lead sheets exported from various marketing channels (Facebook Ads, Google Ads, raw Excel sheets, Real Estate CRMs) into a single, unified CRM database. 
 - **Why this is hard:** It is not about simply parsing CSV files; it is about semantic field mapping. Raw columns have dynamic, messy, or ambiguous headers (e.g., "Full Name", "Lead Name", "first_name", "phone", "contact_no") and unstructured values that require context-aware mapping rather than basic string-matching algorithms.
