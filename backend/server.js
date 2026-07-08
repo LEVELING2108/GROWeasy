@@ -271,10 +271,6 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         }
       }
 
-      const statusNote = fallbackMode 
-        ? '[Fallback: Gemini API rate limited. Deterministic map used.] ' 
-        : 'Simulated mapping (Set active GEMINI_API_KEY to use AI). ';
-
       return {
         created_at,
         name: name || `Lead ${idx + 1}`,
@@ -287,7 +283,7 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         country: 'India',
         lead_owner: 'owner@groweasy.ai',
         crm_status,
-        crm_note: statusNote + crm_note,
+        crm_note: crm_note,
         data_source: matchedSource || (allowedSources.includes(data_source) ? data_source : 'leads_on_demand'),
         possession_time,
         description
