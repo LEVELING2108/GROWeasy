@@ -7,7 +7,7 @@ An intelligent, AI-powered CSV importer built to standardize arbitrary CRM lead 
 - **Why this is hard:** It is not about simply parsing CSV files; it is about semantic field mapping. Raw columns have dynamic, messy, or ambiguous headers (e.g., "Full Name", "Lead Name", "first_name", "phone", "contact_no") and unstructured values that require context-aware mapping rather than basic string-matching algorithms.
 
 ## Live Demo
-- **Hosted URL:** `https://[YOUR_VERCEL_APP_URL].vercel.app` *(Update this with your Vercel deployment link)*
+- **Hosted URL:** https://gro-weasy.vercel.app/
 - **GitHub Repo:** `https://github.com/LEVELING2108/GROWeasy.git`
 - **Hosted Backend URL:** `https://groweasy-backend-a7il.onrender.com`
 
