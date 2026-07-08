@@ -171,4 +171,4 @@ Configure the following inside `backend/.env`:
 ---
 
 ## Submission
-- **Position Applied For:** Software Developer Intern / Software Developer (Full-Time) *(Select one)*
+- **Position Applied For:** Software Developer Intern
