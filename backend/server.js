@@ -681,6 +681,102 @@ app.post('/api/leads/delete', async (req, res) => {
   }
 });
 
+// Route to generate simulated leads for testing and CRM environment realism
+app.post('/api/leads/generate', async (req, res) => {
+  try {
+    const { campaign, count, quality } = req.body;
+    const numCount = parseInt(count) || 5;
+    
+    const firstNames = ["Amit", "Rohan", "Suresh", "Vijay", "Anjali", "Sonia", "Neha", "Deepak", "Raj", "Vikram", "Priya", "Karan", "Aditya", "Meera", "Sunita", "Rahul", "Pooja", "Arjun"];
+    const lastNames = ["Kumar", "Sharma", "Patel", "Nair", "Mishra", "Reddy", "Rao", "Shah", "Mehta", "Joshi", "Roy", "Sen", "Verma", "Gupta", "Singh", "Das"];
+    const companies = ["TechSolutions Co", "Random Corp", "Startup.in", "Digital India Corp", "Fintech Labs", "Apex Ventures", "Delta Systems"];
+    const cities = ["Mumbai", "Pune", "Chennai", "Ahmedabad", "Hyderabad", "Bangalore", "Delhi", "Kolkata", "Noida", "Gurugram"];
+    const states = ["Maharashtra", "Maharashtra", "Tamil Nadu", "Gujarat", "Telangana", "Karnataka", "Delhi", "West Bengal", "Uttar Pradesh", "Haryana"];
+    
+    const newLeads = [];
+    const existingLeads = loadLeadsFromDatabase();
+    
+    for (let i = 0; i < numCount; i++) {
+      const fn = firstNames[Math.floor(Math.random() * firstNames.length)];
+      const ln = lastNames[Math.floor(Math.random() * lastNames.length)];
+      const name = `${fn} ${ln}`;
+      const email = `${fn.toLowerCase()}.${ln.toLowerCase()}${Math.floor(Math.random() * 1000)}@${companies[Math.floor(Math.random() * companies.length)].toLowerCase().replace(/\s+/g, '')}.com`;
+      const phone = `+91 ${9000000000 + Math.floor(Math.random() * 999999999)}`;
+      
+      const cityIdx = Math.floor(Math.random() * cities.length);
+      const city = cities[cityIdx];
+      const state = states[cityIdx];
+      
+      let crm_status = "GOOD_LEAD_FOLLOW_UP";
+      if (quality === "mostly_interested") {
+        crm_status = Math.random() > 0.3 ? "GOOD_LEAD_FOLLOW_UP" : "SALE_DONE";
+      } else if (quality === "mostly_junk") {
+        crm_status = Math.random() > 0.3 ? "BAD_LEAD" : "DID_NOT_CONNECT";
+      } else {
+        const statuses = ["GOOD_LEAD_FOLLOW_UP", "SALE_DONE", "DID_NOT_CONNECT", "BAD_LEAD"];
+        crm_status = statuses[Math.floor(Math.random() * statuses.length)];
+      }
+      
+      let crm_note = `Generated from Simulator Campaign: ${campaign}.`;
+      if (crm_status === "DID_NOT_CONNECT") crm_note += " Call back scheduled.";
+      else if (crm_status === "BAD_LEAD") crm_note += " Wrong number/Spam lead.";
+      
+      newLeads.push({
+        created_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        name,
+        email,
+        country_code: "+91",
+        mobile_without_country_code: phone.split(' ')[1],
+        company: companies[Math.floor(Math.random() * companies.length)],
+        city,
+        state,
+        country: "India",
+        lead_owner: "agent.allocator@groweasy.ai",
+        crm_status,
+        crm_note,
+        data_source: campaign || "leads_on_demand",
+        possession_time: "Immediate",
+        description: `Automated campaign lead.`
+      });
+    }
+    
+    // Check de-duplication rules before adding generated leads
+    const uniqueGeneratedLeads = [];
+    newLeads.forEach(newLead => {
+      const isDuplicate = existingLeads.some(existing => {
+        const emailMatch = newLead.email && existing.email && 
+                           newLead.email.trim().toLowerCase() === existing.email.trim().toLowerCase();
+        const phoneMatch = newLead.mobile_without_country_code && existing.mobile_without_country_code && 
+                           newLead.mobile_without_country_code.trim() === existing.mobile_without_country_code.trim();
+        
+        if (emailMatch) return true;
+        if (phoneMatch) {
+          const nameMatch = newLead.name && existing.name &&
+                            newLead.name.trim().toLowerCase() === existing.name.trim().toLowerCase();
+          return nameMatch || (!newLead.email && !existing.email);
+        }
+        return false;
+      });
+      
+      if (!isDuplicate) {
+        uniqueGeneratedLeads.push(newLead);
+      }
+    });
+    
+    const combined = [...uniqueGeneratedLeads, ...existingLeads];
+    await saveLeadsToDatabase(combined);
+    
+    res.json({
+      success: true,
+      count: uniqueGeneratedLeads.length,
+      records: uniqueGeneratedLeads
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to generate leads", details: err.message });
+  }
+});
+
 // Server status route
 app.get('/api/health', (req, res) => {
   try {

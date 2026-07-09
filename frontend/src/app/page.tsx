@@ -152,8 +152,284 @@ const autoDetectMappings = (headers: string[]) => {
 
 export default function CSVImporterPage() {
   // Navigation States
-  const [activeTab, setActiveTab] = useState<'sources' | 'analytics' | 'leads'>('sources');
-  
+  const [activeTab, setActiveTab] = useState<'sources' | 'analytics' | 'leads' | 'generate' | 'engage' | 'team' | 'ads' | 'whatsapp' | 'telecalling' | 'crmfields' | 'apicenter' | 'business'>('sources');
+
+  // Generator Simulator States
+  const [genCampaign, setGenCampaign] = useState('leads_on_demand');
+  const [genCount, setGenCount] = useState(5);
+  const [genQuality, setGenQuality] = useState('mix');
+  const [genLogs, setGenLogs] = useState<string[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Engage Blaster States
+  const [engageTemplate, setEngageTemplate] = useState('welcome');
+  const [engageSegment, setEngageSegment] = useState('GOOD_LEAD_FOLLOW_UP');
+  const [engageLogs, setEngageLogs] = useState<string[]>([]);
+  const [isEngaging, setIsEngaging] = useState(false);
+  const [engageProgress, setEngageProgress] = useState(0);
+
+  // Team Manager States
+  const [agents, setAgents] = useState([
+    { id: 1, name: 'Rahul Sharma', email: 'rahul@groweasy.ai', role: 'Sales Team Lead', assigned: 42, status: 'Active' },
+    { id: 2, name: 'Anjali Nair', email: 'anjali@groweasy.ai', role: 'Relationship Manager', assigned: 35, status: 'Active' },
+    { id: 3, name: 'Sonia Mishra', email: 'sonia@groweasy.ai', role: 'Sales Executive', assigned: 28, status: 'Away' }
+  ]);
+  const [newAgentName, setNewAgentName] = useState('');
+  const [newAgentEmail, setNewAgentEmail] = useState('');
+  const [newAgentRole, setNewAgentRole] = useState('Sales Executive');
+  const [roundRobinEnabled, setRoundRobinEnabled] = useState(true);
+
+  // Ad Accounts Connect States
+  const [adsMetaConnected, setAdsMetaConnected] = useState(true);
+  const [adsGoogleConnected, setAdsGoogleConnected] = useState(false);
+  const [adsLinkedInConnected, setAdsLinkedInConnected] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState<string | null>(null);
+  const [isConnectingAd, setIsConnectingAd] = useState(false);
+
+  // WhatsApp Config States
+  const [waPhoneId, setWaPhoneId] = useState('1092837482937');
+  const [waToken, setWaToken] = useState('EAAGzDkZBz123BABcdEFghijKlmno...');
+  const [waWabaId, setWaWabaId] = useState('908123746234');
+  const [waStatus, setWaStatus] = useState<'connected' | 'checking' | 'disconnected'>('connected');
+  const [waPingResult, setWaPingResult] = useState<string | null>(null);
+
+  // Tele Calling States
+  const [dialerNumber, setDialerNumber] = useState('');
+  const [dialerState, setDialerState] = useState<'idle' | 'calling' | 'connected'>('idle');
+  const [dialerTimer, setDialerTimer] = useState(0);
+  const [teleLogs, setTeleLogs] = useState([
+    { lead: 'Suresh Kumar', phone: '+91 9552284142', duration: '2m 15s', time: '10 mins ago', status: 'Answered' },
+    { lead: 'Anjali Nair', phone: '+91 9605918115', duration: '0m 45s', time: '1 hour ago', status: 'Answered' },
+    { lead: 'Vijay Patel', phone: '+91 9907320073', duration: '1m 20s', time: '3 hours ago', status: 'Answered' }
+  ]);
+  const [recordingPlaying, setRecordingPlaying] = useState<number | null>(null);
+
+  // Custom CRM Fields States
+  const [customCrmFields, setCustomCrmFields] = useState<Array<{ name: string; label: string; type: string; desc: string }>>([
+    { name: 'property_budget', label: 'Budget Requirement', type: 'Number', desc: 'Max budget limit of the buyer in INR' },
+    { name: 'preferred_location', label: 'Preferred Location', type: 'String', desc: 'Specific micro-market location preference' }
+  ]);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [newFieldType, setNewFieldType] = useState('String');
+  const [newFieldDesc, setNewFieldDesc] = useState('');
+
+  // API Developer States
+  const [developerApiKey, setDeveloperApiKey] = useState('groweasy_live_pk_8a9d12d4809bc48d');
+  const [webhookUrl, setWebhookUrl] = useState('https://crm.groweasy.ai/webhooks/meta-leads');
+  const [apiDocTab, setApiDocTab] = useState<'curl' | 'node' | 'python'>('curl');
+
+  // Business Center States
+  const [businessName, setBusinessName] = useState('GrowEasy Property Developers Ltd');
+  const [businessPlan, setBusinessPlan] = useState('Enterprise Pro Tier');
+
+  // Lead Generation Simulator Function
+  const handleIngestSimulatedLeads = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setGenLogs(["Initializing Campaign connection...", `Connecting to channel: ${genCampaign}...`]);
+
+    try {
+      const response = await fetch(`${API_URL}/api/leads/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaign: genCampaign,
+          count: genCount,
+          quality: genQuality
+        })
+      });
+
+      if (!response.ok) throw new Error("Simulator failed to generate leads.");
+
+      const result = await response.json();
+      if (result.success && result.records) {
+        setLeads(prev => {
+          const combined = [...result.records, ...prev];
+          const unique: MappedLead[] = [];
+          const seen = new Set<string>();
+          combined.forEach(l => {
+            const emailPart = l.email ? l.email.trim().toLowerCase() : '';
+            const phonePart = l.mobile_without_country_code ? l.mobile_without_country_code.trim() : '';
+            const key = `${emailPart}_${phonePart}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              unique.push(l);
+            }
+          });
+          return unique;
+        });
+
+        setGenLogs(prev => [
+          ...prev,
+          "Connection established.",
+          `Attribution check complete. Found ${result.records.length} new unique leads.`,
+          ...result.records.map((r: any) => `✓ Ingested: ${r.name} (${r.email || r.mobile_without_country_code}) -> Mapped to CRM`),
+          `🎉 SUCCESS! Simulated ingestion complete. ${result.records.length} leads added to database.`
+        ]);
+      } else {
+        throw new Error("No records generated.");
+      }
+    } catch (err: any) {
+      setGenLogs(prev => [...prev, `❌ ERROR: ${err.message || 'Simulator failed.'}`]);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Message Blaster Campaign Simulator
+  const handleTriggerMessageBlast = () => {
+    if (isEngaging) return;
+    setIsEngaging(true);
+    setEngageProgress(10);
+    
+    const targets = leads.filter(l => l.crm_status === engageSegment);
+    
+    if (targets.length === 0) {
+      setEngageLogs([`No leads found in CRM segment: ${engageSegment}. Import or generate leads first!`]);
+      setIsEngaging(false);
+      return;
+    }
+
+    setEngageLogs([`Initializing Blast Campaign using template: "${engageTemplate}"...`, `Found ${targets.length} target leads in segment.`]);
+
+    let idx = 0;
+    const interval = setInterval(() => {
+      if (idx >= targets.length) {
+        clearInterval(interval);
+        setEngageProgress(100);
+        setEngageLogs(prev => [...prev, `🎉 Campaign blast completed! Sent ${targets.length} notifications.`]);
+        setIsEngaging(false);
+        return;
+      }
+
+      const lead = targets[idx];
+      setEngageLogs(prev => [
+        ...prev,
+        `📲 Sending message to ${lead.name} (${lead.mobile_without_country_code || lead.email}) ... SUCCESS`
+      ]);
+      setEngageProgress(Math.min(90, Math.round(((idx + 1) / targets.length) * 100)));
+      idx++;
+    }, 600);
+  };
+
+  // Dialer Functions
+  const handleDialNumber = (num: string) => {
+    setDialerNumber(prev => prev + num);
+  };
+
+  const handleStartCall = (phoneNum?: string) => {
+    const targetPhone = phoneNum || dialerNumber;
+    if (!targetPhone.trim()) return;
+
+    setDialerState('calling');
+    setDialerNumber(targetPhone);
+    setDialerTimer(0);
+
+    const callTimer = setInterval(() => {
+      setDialerTimer(prev => prev + 1);
+    }, 1000);
+
+    setTimeout(() => {
+      setDialerState('connected');
+    }, 2000);
+
+    (window as any)._dialerTimerRef = callTimer;
+  };
+
+  const handleHangUp = () => {
+    if ((window as any)._dialerTimerRef) {
+      clearInterval((window as any)._dialerTimerRef);
+      delete (window as any)._dialerTimerRef;
+    }
+    
+    if (dialerState === 'connected' || dialerState === 'calling') {
+      const minutes = Math.floor(dialerTimer / 60);
+      const seconds = dialerTimer % 60;
+      const durationStr = `${minutes}m ${seconds}s`;
+      
+      setTeleLogs(prev => [
+        {
+          lead: leads.find(l => l.mobile_without_country_code === dialerNumber || l.email === dialerNumber)?.name || 'Unknown Buyer',
+          phone: dialerNumber,
+          duration: durationStr,
+          time: 'Just now',
+          status: dialerState === 'connected' ? 'Answered' : 'No Answer'
+        },
+        ...prev
+      ]);
+    }
+
+    setDialerState('idle');
+    setDialerNumber('');
+    setDialerTimer(0);
+  };
+
+  // WhatsApp Ping Test
+  const handleTestWhatsAppPing = () => {
+    setWaStatus('checking');
+    setWaPingResult(null);
+
+    setTimeout(() => {
+      setWaStatus('connected');
+      setWaPingResult("WhatsApp Cloud API status: ONLINE (Latency: 38ms) - Connection Verified.");
+    }, 1500);
+  };
+
+  // Connect Ad Account
+  const handleSimulateAdConnection = (platform: string) => {
+    setShowConnectModal(platform);
+    setIsConnectingAd(true);
+
+    setTimeout(() => {
+      if (platform === 'google') setAdsGoogleConnected(true);
+      else if (platform === 'linkedin') setAdsLinkedInConnected(true);
+      setIsConnectingAd(false);
+      setShowConnectModal(null);
+    }, 2000);
+  };
+
+  // Custom CRM Fields
+  const handleAddCustomCrmField = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFieldName.trim() || !newFieldLabel.trim()) return;
+
+    setCustomCrmFields(prev => [
+      ...prev,
+      {
+        name: newFieldName.toLowerCase().replace(/\s+/g, '_'),
+        label: newFieldLabel,
+        type: newFieldType,
+        desc: newFieldDesc
+      }
+    ]);
+
+    setNewFieldName('');
+    setNewFieldLabel('');
+    setNewFieldDesc('');
+  };
+
+  // Add Sales Agent
+  const handleAddAgent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAgentName.trim() || !newAgentEmail.trim()) return;
+
+    setAgents(prev => [
+      ...prev,
+      {
+        id: prev.length + 1,
+        name: newAgentName,
+        email: newAgentEmail,
+        role: newAgentRole,
+        assigned: 0,
+        status: 'Active'
+      }
+    ]);
+
+    setNewAgentName('');
+    setNewAgentEmail('');
+  };
+
   // Importer Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState<1 | 2 | 3 | 4>(1); // 1: Upload, 2: Preview, 3: Processing, 4: Complete
@@ -599,7 +875,10 @@ export default function CSVImporterPage() {
               <TrendingUp size={16} />
               <span>Analytics</span>
             </div>
-            <div className="sidebar-link">
+            <div 
+              className={`sidebar-link ${activeTab === 'generate' ? 'active' : ''}`}
+              onClick={() => setActiveTab('generate')}
+            >
               <Radio size={16} />
               <span>Generate Leads</span>
             </div>
@@ -610,7 +889,10 @@ export default function CSVImporterPage() {
               <Users size={16} />
               <span>Manage Leads</span>
             </div>
-            <div className="sidebar-link">
+            <div 
+              className={`sidebar-link ${activeTab === 'engage' ? 'active' : ''}`}
+              onClick={() => setActiveTab('engage')}
+            >
               <Briefcase size={16} />
               <span>Engage Leads</span>
             </div>
@@ -618,7 +900,10 @@ export default function CSVImporterPage() {
 
           <div className="sidebar-section-title">Control Center</div>
           <nav className="sidebar-nav">
-            <div className="sidebar-link">
+            <div 
+              className={`sidebar-link ${activeTab === 'team' ? 'active' : ''}`}
+              onClick={() => setActiveTab('team')}
+            >
               <Users size={16} />
               <span>Team Members</span>
             </div>
@@ -629,23 +914,38 @@ export default function CSVImporterPage() {
               <Radio size={16} />
               <span>Lead Sources</span>
             </div>
-            <div className="sidebar-link">
+            <div 
+              className={`sidebar-link ${activeTab === 'ads' ? 'active' : ''}`}
+              onClick={() => setActiveTab('ads')}
+            >
               <LayoutDashboard size={16} />
               <span>Ad Accounts</span>
             </div>
-            <div className="sidebar-link">
+            <div 
+              className={`sidebar-link ${activeTab === 'whatsapp' ? 'active' : ''}`}
+              onClick={() => setActiveTab('whatsapp')}
+            >
               <Radio size={16} />
               <span>WhatsApp Account</span>
             </div>
-            <div className="sidebar-link">
+            <div 
+              className={`sidebar-link ${activeTab === 'telecalling' ? 'active' : ''}`}
+              onClick={() => setActiveTab('telecalling')}
+            >
               <Users size={16} />
               <span>Tele Calling</span>
             </div>
-            <div className="sidebar-link">
+            <div 
+              className={`sidebar-link ${activeTab === 'crmfields' ? 'active' : ''}`}
+              onClick={() => setActiveTab('crmfields')}
+            >
               <Briefcase size={16} />
               <span>CRM Fields</span>
             </div>
-            <div className="sidebar-link">
+            <div 
+              className={`sidebar-link ${activeTab === 'apicenter' ? 'active' : ''}`}
+              onClick={() => setActiveTab('apicenter')}
+            >
               <Server size={16} />
               <span>API Center</span>
             </div>
@@ -654,7 +954,10 @@ export default function CSVImporterPage() {
         </div>
 
         <div className="sidebar-footer">
-          <div className="sidebar-link">
+          <div 
+            className={`sidebar-link ${activeTab === 'business' ? 'active' : ''}`}
+            onClick={() => setActiveTab('business')}
+          >
             <Briefcase size={16} />
             <span>Business Center</span>
           </div>
@@ -1197,6 +1500,890 @@ export default function CSVImporterPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 3: GENERATE LEADS SIMULATOR */}
+        {activeTab === 'generate' && (
+          <div className="animate-fade-in">
+            <div className="view-header" style={{ marginBottom: '1.5rem' }}>
+              <h2 className="view-title">Lead Ingestion Simulator</h2>
+              <p className="view-subtitle">Simulate real-time inbound webhooks from Facebook Lead Ads, Google Form fills, and campaigns.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              {/* Generator Settings Card */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">
+                  <Radio size={16} style={{ color: 'var(--primary)' }} />
+                  Configure Simulated Campaign
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Attribution Data Source</label>
+                    <select 
+                      value={genCampaign} 
+                      onChange={(e) => setGenCampaign(e.target.value)}
+                      style={{ padding: '0.55rem', fontSize: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }}
+                    >
+                      <option value="leads_on_demand">Leads On Demand (Default Campaign)</option>
+                      <option value="meridian_tower">Meridian Tower (Real Estate Launch)</option>
+                      <option value="eden_park">Eden Park (Villa Plots)</option>
+                      <option value="varah_swamy">Varah Swamy Apartments</option>
+                      <option value="sarjapur_plots">Sarjapur Road Plots</option>
+                      <option value="facebook_ads">Facebook Lead Form Ad</option>
+                      <option value="google_ads">Google PPC Search Form</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Number of Leads to Generate</label>
+                    <select 
+                      value={genCount} 
+                      onChange={(e) => setGenCount(parseInt(e.target.value))}
+                      style={{ padding: '0.55rem', fontSize: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }}
+                    >
+                      <option value="1">1 Lead</option>
+                      <option value="5">5 Leads</option>
+                      <option value="10">10 Leads</option>
+                      <option value="20">20 Leads</option>
+                      <option value="50">50 Leads (Large Batch)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Lead Interest Profile (Quality)</label>
+                    <select 
+                      value={genQuality} 
+                      onChange={(e) => setGenQuality(e.target.value)}
+                      style={{ padding: '0.55rem', fontSize: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }}
+                    >
+                      <option value="mix">Balanced Mix (Interested, Call Back, Junk)</option>
+                      <option value="mostly_interested">High Quality (Mostly interested & closed sales)</option>
+                      <option value="mostly_junk">Low Quality (Mostly incorrect contact details & bad status)</option>
+                    </select>
+                  </div>
+
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleIngestSimulatedLeads}
+                    disabled={isGenerating}
+                    style={{ marginTop: '0.5rem', width: '100%', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  >
+                    {isGenerating ? <Loader2 size={16} className="animate-spin-one" /> : <Radio size={16} />}
+                    Trigger Simulated Ingestion
+                  </button>
+                </div>
+              </div>
+
+              {/* Console Log output */}
+              <div className="analytics-card" style={{ background: '#0f172a', borderColor: '#1e293b' }}>
+                <h3 className="analytics-card-title" style={{ color: '#94a3b8', borderBottomColor: '#1e293b' }}>
+                  <Server size={16} style={{ color: '#38bdf8' }} />
+                  Simulator Ingestion Log Console
+                </h3>
+                <div style={{ flexGrow: 1, fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: '#38bdf8', overflowY: 'auto', maxHeight: '280px', display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.5rem' }}>
+                  {genLogs.length === 0 ? (
+                    <span style={{ color: '#64748b' }}>// Configure campaign options and click trigger to see log output...</span>
+                  ) : (
+                    genLogs.map((log, idx) => (
+                      <div key={idx} style={{ lineHeight: '1.4', color: log.startsWith('✓') ? '#4ade80' : log.startsWith('🎉') ? '#a7f3d0' : log.startsWith('❌') ? '#f87171' : '#38bdf8' }}>{log}</div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 4: ENGAGE LEADS (Template message blasting) */}
+        {activeTab === 'engage' && (
+          <div className="animate-fade-in">
+            <div className="view-header" style={{ marginBottom: '1.5rem' }}>
+              <h2 className="view-title">Outreach Message Blaster</h2>
+              <p className="view-subtitle">Bulk dispatch verified WhatsApp Business and email marketing templates to lead segments.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              {/* Campaign Configurations */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">
+                  <Briefcase size={16} style={{ color: 'var(--primary)' }} />
+                  Trigger Template Campaign
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Message Template</label>
+                    <select 
+                      value={engageTemplate} 
+                      onChange={(e) => setEngageTemplate(e.target.value)}
+                      style={{ padding: '0.55rem', fontSize: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }}
+                    >
+                      <option value="welcome">Standard Welcome Follow-up (WhatsApp + Email)</option>
+                      <option value="discount">Launch Discount Promo: 5% Off Flats (WhatsApp)</option>
+                      <option value="reverify">Contact Verification Request: Re-verify phone (Email)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Target Lead Segment</label>
+                    <select 
+                      value={engageSegment} 
+                      onChange={(e) => setEngageSegment(e.target.value)}
+                      style={{ padding: '0.55rem', fontSize: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }}
+                    >
+                      <option value="GOOD_LEAD_FOLLOW_UP">Good Leads / Active Follow-ups</option>
+                      <option value="DID_NOT_CONNECT">Not Dialed / No Answer</option>
+                      <option value="BAD_LEAD">Bad Leads / Junk</option>
+                      <option value="SALE_DONE">Deal Won / Closed Sales</option>
+                    </select>
+                  </div>
+
+                  {isEngaging && (
+                    <div style={{ marginTop: '0.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                        <span>Blasting templates in progress...</span>
+                        <span>{engageProgress}%</span>
+                      </div>
+                      <div className="progress-track" style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div className="progress-bar" style={{ height: '100%', width: `${engageProgress}%`, background: 'var(--primary)', transition: 'width 0.3s ease' }}></div>
+                      </div>
+                    </div>
+                  )}
+
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleTriggerMessageBlast}
+                    disabled={isEngaging || leads.length === 0}
+                    style={{ marginTop: '0.5rem', width: '100%', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  >
+                    {isEngaging ? <Loader2 size={16} className="animate-spin-one" /> : <Briefcase size={16} />}
+                    Dispatch Campaign Blast
+                  </button>
+                </div>
+              </div>
+
+              {/* Execution console output */}
+              <div className="analytics-card" style={{ background: '#0f172a', borderColor: '#1e293b' }}>
+                <h3 className="analytics-card-title" style={{ color: '#94a3b8', borderBottomColor: '#1e293b' }}>
+                  <Server size={16} style={{ color: '#a7f3d0' }} />
+                  Message dispatch execution log
+                </h3>
+                <div style={{ flexGrow: 1, fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: '#a7f3d0', overflowY: 'auto', maxHeight: '280px', display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.5rem' }}>
+                  {engageLogs.length === 0 ? (
+                    <span style={{ color: '#64748b' }}>// Blast campaign output logs show here...</span>
+                  ) : (
+                    engageLogs.map((log, idx) => (
+                      <div key={idx} style={{ lineHeight: '1.4', color: log.startsWith('🎉') ? '#4ade80' : log.startsWith('❌') ? '#f87171' : '#a7f3d0' }}>{log}</div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 5: TEAM MEMBERS */}
+        {activeTab === 'team' && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="view-header">
+              <h2 className="view-title">Team Management</h2>
+              <p className="view-subtitle">Manage CRM sales agents and configure Round-Robin lead routing filters.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr', gap: '1.5rem' }}>
+              {/* Active Agents list */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">
+                  <Users size={16} style={{ color: 'var(--primary)' }} />
+                  Active Sales Team Representatives
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {agents.map((agent) => (
+                    <div 
+                      key={agent.id} 
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'var(--bg-main)' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-full)', background: 'var(--primary)', color: 'var(--primary-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
+                          {agent.name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{agent.name}</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{agent.email} • {agent.role}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>{agent.assigned}</span>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>leads assigned</span>
+                        </div>
+                        <span 
+                          style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem', borderRadius: 'var(--radius-sm)', fontWeight: 600, background: agent.status === 'Active' ? 'var(--status-good-bg)' : 'var(--status-not-dialed-bg)', color: agent.status === 'Active' ? 'var(--status-good-text)' : 'var(--status-not-dialed-text)' }}
+                        >
+                          {agent.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Assignment settings & Add member */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Add agent form */}
+                <div className="analytics-card">
+                  <h3 className="analytics-card-title">Add Team Representative</h3>
+                  <form onSubmit={handleAddAgent} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Agent Name</label>
+                      <input 
+                        type="text" 
+                        value={newAgentName} 
+                        onChange={(e) => setNewAgentName(e.target.value)} 
+                        placeholder="John Doe"
+                        required
+                        style={{ padding: '0.45rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Agent Email</label>
+                      <input 
+                        type="email" 
+                        value={newAgentEmail} 
+                        onChange={(e) => setNewAgentEmail(e.target.value)} 
+                        placeholder="john@groweasy.ai"
+                        required
+                        style={{ padding: '0.45rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Role</label>
+                      <select 
+                        value={newAgentRole} 
+                        onChange={(e) => setNewAgentRole(e.target.value)}
+                        style={{ padding: '0.45rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                      >
+                        <option value="Sales Executive">Sales Executive</option>
+                        <option value="Relationship Manager">Relationship Manager</option>
+                        <option value="Support Agent">Support Agent</option>
+                      </select>
+                    </div>
+                    <button className="btn btn-primary" type="submit" style={{ padding: '0.55rem', fontSize: '0.75rem', marginTop: '0.25rem' }}>Add Representative</button>
+                  </form>
+                </div>
+
+                {/* Auto assignment logic */}
+                <div className="analytics-card">
+                  <h3 className="analytics-card-title">Routing Config</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>Auto-assignment Router</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Round-Robin lead allocations on new imports</span>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={roundRobinEnabled} 
+                      onChange={(e) => setRoundRobinEnabled(e.target.checked)} 
+                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 6: AD ACCOUNTS */}
+        {activeTab === 'ads' && (
+          <div className="animate-fade-in">
+            <div className="view-header" style={{ marginBottom: '1.5rem' }}>
+              <h2 className="view-title">Ad Platforms Integration</h2>
+              <p className="view-subtitle">Connect CRM pipelines directly to Meta Lead Ads, Google Search Forms, and external web forms.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+              {/* Meta Card */}
+              <div className="analytics-card" style={{ border: adsMetaConnected ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border-color)', background: adsMetaConnected ? 'rgba(16,185,129,0.01)' : 'var(--bg-surface)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Meta Ads Integration (Facebook & Instagram)</div>
+                  <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem', borderRadius: 'var(--radius-full)', fontWeight: 600, background: adsMetaConnected ? 'var(--status-good-bg)' : 'var(--status-bad-bg)', color: adsMetaConnected ? 'var(--status-good-text)' : 'var(--status-bad-text)' }}>
+                    {adsMetaConnected ? 'CONNECTED' : 'NOT CONNECTED'}
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+                  Sync lead forms built inside Meta Forms Manager directly into the CRM database using real-time Webhook hooks.
+                </p>
+                <div style={{ marginTop: 'auto' }}>
+                  <button 
+                    className={`btn ${adsMetaConnected ? 'btn-secondary' : 'btn-primary'}`} 
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.75rem' }}
+                    onClick={() => adsMetaConnected ? setAdsMetaConnected(false) : setAdsMetaConnected(true)}
+                  >
+                    {adsMetaConnected ? 'Disconnect Integration' : 'Connect Facebook Ads'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Google Ads Card */}
+              <div className="analytics-card" style={{ border: adsGoogleConnected ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border-color)', background: adsGoogleConnected ? 'rgba(16,185,129,0.01)' : 'var(--bg-surface)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Google Search Form Ads</div>
+                  <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem', borderRadius: 'var(--radius-full)', fontWeight: 600, background: adsGoogleConnected ? 'var(--status-good-bg)' : 'var(--status-bad-bg)', color: adsGoogleConnected ? 'var(--status-good-text)' : 'var(--status-bad-text)' }}>
+                    {adsGoogleConnected ? 'CONNECTED' : 'NOT CONNECTED'}
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+                  Automatically maps Google Search ad extension lead submissions into unified CRM schemas.
+                </p>
+                <div style={{ marginTop: 'auto' }}>
+                  <button 
+                    className={`btn ${adsGoogleConnected ? 'btn-secondary' : 'btn-primary'}`} 
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.75rem' }}
+                    onClick={() => adsGoogleConnected ? setAdsGoogleConnected(false) : handleSimulateAdConnection('google')}
+                  >
+                    {adsGoogleConnected ? 'Disconnect Integration' : 'Connect Google Ads'}
+                  </button>
+                </div>
+              </div>
+
+              {/* LinkedIn Ads Card */}
+              <div className="analytics-card" style={{ border: adsLinkedInConnected ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border-color)', background: adsLinkedInConnected ? 'rgba(16,185,129,0.01)' : 'var(--bg-surface)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>LinkedIn Gen Forms</div>
+                  <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem', borderRadius: 'var(--radius-full)', fontWeight: 600, background: adsLinkedInConnected ? 'var(--status-good-bg)' : 'var(--status-bad-bg)', color: adsLinkedInConnected ? 'var(--status-good-text)' : 'var(--status-bad-text)' }}>
+                    {adsLinkedInConnected ? 'CONNECTED' : 'NOT CONNECTED'}
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+                  Sync B2B leads generated from LinkedIn sponsored posts and campaign forms.
+                </p>
+                <div style={{ marginTop: 'auto' }}>
+                  <button 
+                    className={`btn ${adsLinkedInConnected ? 'btn-secondary' : 'btn-primary'}`} 
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.75rem' }}
+                    onClick={() => adsLinkedInConnected ? setAdsLinkedInConnected(false) : handleSimulateAdConnection('linkedin')}
+                  >
+                    {adsLinkedInConnected ? 'Disconnect Integration' : 'Connect LinkedIn Forms'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Simulated Connect OAuth Modal */}
+            {showConnectModal && (
+              <div className="modal-overlay" style={{ zIndex: 1000 }}>
+                <div className="modal-container" style={{ maxWidth: '380px', textAlign: 'center', padding: '2rem' }}>
+                  <Loader2 size={36} className="animate-spin-one" style={{ color: 'var(--primary)', marginBottom: '1rem', margin: '0 auto' }} />
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.25rem' }}>Simulating {showConnectModal === 'google' ? 'Google' : 'LinkedIn'} OAuth Verification</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Syncing APIs credentials and verifying callbacks...</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW 7: WHATSAPP ACCOUNT */}
+        {activeTab === 'whatsapp' && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="view-header">
+              <h2 className="view-title">WhatsApp Business Cloud API</h2>
+              <p className="view-subtitle">Connect your Meta WhatsApp Business API tokens to trigger automated notifications on new lead sign-ups.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1.5rem' }}>
+              {/* Credentials Configuration */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">WhatsApp Cloud API Config</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>WhatsApp Phone Number ID</label>
+                    <input 
+                      type="text" 
+                      value={waPhoneId} 
+                      onChange={(e) => setWaPhoneId(e.target.value)} 
+                      style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>WhatsApp Business Account ID</label>
+                    <input 
+                      type="text" 
+                      value={waWabaId} 
+                      onChange={(e) => setWaWabaId(e.target.value)} 
+                      style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Cloud API Token</label>
+                    <input 
+                      type="password" 
+                      value={waToken} 
+                      onChange={(e) => setWaToken(e.target.value)} 
+                      style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleTestWhatsAppPing}
+                    disabled={waStatus === 'checking'}
+                    style={{ padding: '0.6rem', fontSize: '0.75rem', marginTop: '0.25rem' }}
+                  >
+                    {waStatus === 'checking' ? 'Testing Connection...' : 'Save & Test API Connection'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Status and Verification Panel */}
+              <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h3 className="analytics-card-title">Integration Status</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ width: '12px', height: '12px', borderRadius: 'var(--radius-full)', background: waStatus === 'connected' ? 'var(--success)' : waStatus === 'checking' ? 'var(--warning)' : 'var(--error)' }}></div>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>{waStatus === 'connected' ? 'Verified' : waStatus === 'checking' ? 'Pinging API...' : 'Disconnected'}</span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                  Verifies configuration pings directly with the Meta Developer API nodes. Enabled notifications dispatch automatically when lead criteria are satisfied.
+                </p>
+                {waPingResult && (
+                  <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', padding: '0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--success-text)' }}>
+                    {waPingResult}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 8: TELE CALLING OUTBOUND DIALER */}
+        {activeTab === 'telecalling' && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="view-header">
+              <h2 className="view-title">Outbound Dialer & Call Logs</h2>
+              <p className="view-subtitle">Simulate client calling dialers, outbound logs, and call recording files.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1.5rem' }}>
+              {/* Column 1: Outbound Keypad */}
+              <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h3 className="analytics-card-title">
+                  <Users size={16} style={{ color: 'var(--primary)' }} />
+                  Interactive Outbound Dialer
+                </h3>
+                
+                {/* Dialer Screen Display */}
+                <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '0.05em' }}>{dialerNumber || '(Enter Phone Number)'}</div>
+                  {dialerState !== 'idle' && (
+                    <div style={{ fontSize: '0.7rem', color: dialerState === 'calling' ? 'var(--warning)' : 'var(--success)', fontWeight: 600 }}>
+                      {dialerState === 'calling' ? 'Pinging connection...' : `CONNECTED (Call Duration: ${Math.floor(dialerTimer/60)}m ${dialerTimer%60}s)`}
+                    </div>
+                  )}
+                </div>
+
+                {/* Keypad Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', width: '220px', margin: '0 auto' }}>
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
+                    <button 
+                      key={digit} 
+                      className="btn btn-secondary" 
+                      onClick={() => handleDialNumber(digit)} 
+                      disabled={dialerState !== 'idle'}
+                      style={{ height: '40px', padding: 0, fontSize: '1rem', fontWeight: 700, borderRadius: 'var(--radius-full)' }}
+                    >
+                      {digit}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Dialer Actions */}
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                  {dialerState === 'idle' ? (
+                    <>
+                      <button 
+                        className="btn btn-confirm" 
+                        onClick={() => handleStartCall()}
+                        disabled={!dialerNumber}
+                        style={{ background: 'var(--success)', color: 'white', padding: '0.5rem 1.5rem', fontSize: '0.8rem' }}
+                      >
+                        Start Call
+                      </button>
+                      <button 
+                        className="btn btn-secondary" 
+                        onClick={() => setDialerNumber('')}
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}
+                      >
+                        Clear
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      className="btn btn-cancel" 
+                      onClick={handleHangUp}
+                      style={{ background: 'var(--error)', color: 'white', padding: '0.5rem 1.5rem', fontSize: '0.8rem' }}
+                    >
+                      Hang Up Call
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Column 2: Outbound Queue & Logs */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Outbound Dialer Queue */}
+                <div className="analytics-card">
+                  <h3 className="analytics-card-title">Outbound Calling Queue</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '130px', overflowY: 'auto' }}>
+                    {leads.filter(l => l.crm_status === 'GOOD_LEAD_FOLLOW_UP' && l.mobile_without_country_code).slice(0, 3).map((lead, idx) => (
+                      <div 
+                        key={idx} 
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.55rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'var(--bg-main)' }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{lead.name}</span>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>{lead.country_code || '+91'} {lead.mobile_without_country_code}</span>
+                        </div>
+                        <button 
+                          className="btn btn-primary" 
+                          onClick={() => handleStartCall(lead.mobile_without_country_code)}
+                          disabled={dialerState !== 'idle'}
+                          style={{ padding: '0.3rem 0.75rem', fontSize: '0.7rem' }}
+                        >
+                          Dial Now
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Call History Logs */}
+                <div className="analytics-card">
+                  <h3 className="analytics-card-title">Dialer Outbound Log Records</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '180px', overflowY: 'auto' }}>
+                    {teleLogs.map((log, idx) => (
+                      <div 
+                        key={idx} 
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.55rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{log.lead}</span>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{log.phone} • {log.duration} • {log.time}</span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button 
+                            className="btn btn-secondary"
+                            onClick={() => setRecordingPlaying(recordingPlaying === idx ? null : idx)}
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          >
+                            <span>{recordingPlaying === idx ? '⏸ Pause' : '▶ Play'} Rec</span>
+                          </button>
+                          <span 
+                            style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', borderRadius: 'var(--radius-sm)', fontWeight: 600, background: log.status === 'Answered' ? 'var(--status-good-bg)' : 'var(--status-bad-bg)', color: log.status === 'Answered' ? 'var(--status-good-text)' : 'var(--status-bad-text)' }}
+                          >
+                            {log.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 9: CRM FIELD MANAGEMENT */}
+        {activeTab === 'crmfields' && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="view-header">
+              <h2 className="view-title">CRM Schema Configuration</h2>
+              <p className="view-subtitle">Review standard system lead headers and configure custom attributes for lead integrations.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
+              {/* Field Schema Table */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">
+                  <Briefcase size={16} style={{ color: 'var(--primary)' }} />
+                  Lead Schema Definitions (15 Standard + Custom)
+                </h3>
+                <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                  <table className="main-leads-table" style={{ width: '100%' }}>
+                    <thead>
+                      <tr>
+                        <th>FIELD KEY</th>
+                        <th>LABEL NAME</th>
+                        <th>DATA TYPE</th>
+                        <th>DESCRIPTION</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {CRM_FIELDS.map(f => (
+                        <tr key={f.key}>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', fontWeight: 700 }}>{f.key}</td>
+                          <td style={{ fontSize: '0.75rem' }}>{f.label}</td>
+                          <td><span className="mapping-badge opt" style={{ fontSize: '0.6rem' }}>String</span></td>
+                          <td style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{f.description}</td>
+                        </tr>
+                      ))}
+                      {customCrmFields.map(f => (
+                        <tr key={f.name} style={{ background: 'rgba(16,185,129,0.02)' }}>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', fontWeight: 700, color: 'var(--success-text)' }}>{f.name} (custom)</td>
+                          <td style={{ fontSize: '0.75rem', fontWeight: 600 }}>{f.label}</td>
+                          <td><span className="mapping-badge req" style={{ fontSize: '0.6rem', background: 'rgba(16,185,129,0.1)', color: 'var(--success)' }}>{f.type}</span></td>
+                          <td style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{f.desc}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Add Custom CRM Field form */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">Create Custom CRM Field</h3>
+                <form onSubmit={handleAddCustomCrmField} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Field Key Name</label>
+                    <input 
+                      type="text" 
+                      value={newFieldName} 
+                      onChange={(e) => setNewFieldName(e.target.value)} 
+                      placeholder="buyer_budget"
+                      required
+                      style={{ padding: '0.45rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Label Display Name</label>
+                    <input 
+                      type="text" 
+                      value={newFieldLabel} 
+                      onChange={(e) => setNewFieldLabel(e.target.value)} 
+                      placeholder="Buyer Budget limit"
+                      required
+                      style={{ padding: '0.45rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Field Type</label>
+                    <select 
+                      value={newFieldType} 
+                      onChange={(e) => setNewFieldType(e.target.value)}
+                      style={{ padding: '0.45rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                    >
+                      <option value="String">String (Text)</option>
+                      <option value="Number">Number (Budget, counts)</option>
+                      <option value="Boolean">Boolean (Yes/No flags)</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Field Description</label>
+                    <textarea 
+                      value={newFieldDesc} 
+                      onChange={(e) => setNewFieldDesc(e.target.value)} 
+                      placeholder="Describe what data this field captures..."
+                      rows={2}
+                      style={{ padding: '0.45rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)', resize: 'none' }}
+                    />
+                  </div>
+                  <button className="btn btn-primary" type="submit" style={{ padding: '0.55rem', fontSize: '0.75rem', marginTop: '0.25rem' }}>Add CRM Field</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 10: API CENTER */}
+        {activeTab === 'apicenter' && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="view-header">
+              <h2 className="view-title">Developer API & Webhooks</h2>
+              <p className="view-subtitle">Ingest leads programmatically into GROWeasy CRM database using Developer endpoints.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1.5rem' }}>
+              {/* Webhook keys & URLs */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Bearer Token */}
+                <div className="analytics-card">
+                  <h3 className="analytics-card-title">Developer API Bearer Key</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={developerApiKey} 
+                        style={{ flexGrow: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', outline: 'none' }}
+                      />
+                      <button 
+                        className="btn btn-secondary" 
+                        onClick={() => setDeveloperApiKey(`groweasy_live_pk_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 8)}`)}
+                        style={{ padding: '0.45rem 0.75rem', fontSize: '0.7rem' }}
+                      >
+                        Regenerate
+                      </button>
+                    </div>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Keep this token secret. Used in the `Authorization` header for HTTP calls.</span>
+                  </div>
+                </div>
+
+                {/* Webhook endpoint URL */}
+                <div className="analytics-card">
+                  <h3 className="analytics-card-title">Inbound Webhook Config</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>External Catch URL</label>
+                      <input 
+                        type="text" 
+                        value={webhookUrl} 
+                        onChange={(e) => setWebhookUrl(e.target.value)} 
+                        style={{ padding: '0.45rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-primary)', outline: 'none' }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Route leads from third-party systems directly into GROWeasy CRM database.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dev Docs Console */}
+              <div className="analytics-card" style={{ background: '#0f172a', borderColor: '#1e293b' }}>
+                <h3 className="analytics-card-title" style={{ color: '#94a3b8', borderBottomColor: '#1e293b' }}>
+                  <Server size={16} style={{ color: '#38bdf8' }} />
+                  Developer API Integration Code Snippets
+                </h3>
+                
+                {/* Doc Tabs */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid #1e293b', paddingBottom: '0.5rem' }}>
+                  <button 
+                    onClick={() => setApiDocTab('curl')}
+                    style={{ background: apiDocTab === 'curl' ? '#1e293b' : 'transparent', color: apiDocTab === 'curl' ? '#fff' : '#64748b', border: 'none', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    cURL Command
+                  </button>
+                  <button 
+                    onClick={() => setApiDocTab('node')}
+                    style={{ background: apiDocTab === 'node' ? '#1e293b' : 'transparent', color: apiDocTab === 'node' ? '#fff' : '#64748b', border: 'none', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Node.js Fetch
+                  </button>
+                  <button 
+                    onClick={() => setApiDocTab('python')}
+                    style={{ background: apiDocTab === 'python' ? '#1e293b' : 'transparent', color: apiDocTab === 'python' ? '#fff' : '#64748b', border: 'none', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Python requests
+                  </button>
+                </div>
+
+                {/* Code Area */}
+                <div style={{ flexGrow: 1, fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: '#e2e8f0', overflowY: 'auto', maxHeight: '250px', whiteSpace: 'pre-wrap', padding: '0.5rem' }}>
+                  {apiDocTab === 'curl' && `curl -X POST "${API_URL}/api/leads/generate" \\
+  -H "Authorization: Bearer ${developerApiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "campaign": "leads_on_demand",
+    "count": 5,
+    "quality": "mostly_interested"
+  }'`}
+                  {apiDocTab === 'node' && `const url = "${API_URL}/api/leads/generate";
+const data = {
+  campaign: "leads_on_demand",
+  count: 5,
+  quality: "mostly_interested"
+};
+
+fetch(url, {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer ${developerApiKey}",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify(data)
+})
+.then(res => res.json())
+.then(json => console.log("Leads Ingested:", json.count))
+.catch(err => console.error("API Error:", err));`}
+                  {apiDocTab === 'python' && `import requests
+
+url = "${API_URL}/api/leads/generate"
+headers = {
+    "Authorization": "Bearer ${developerApiKey}",
+    "Content-Type": "application/json"
+}
+data = {
+    "campaign": "leads_on_demand",
+    "count": 5,
+    "quality": "mostly_interested"
+}
+
+response = requests.post(url, headers=headers, json=data)
+print("Response Status:", response.status_code)
+print("Leads Count:", response.json().get('count'))`}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 11: BUSINESS CENTER */}
+        {activeTab === 'business' && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="view-header">
+              <h2 className="view-title">Business Center Settings</h2>
+              <p className="view-subtitle">Review CRM billing workspaces, profile identifiers, and usage metrics.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
+              {/* Workspace profile details */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">Business Account Profile</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Company Legal Name</label>
+                    <input 
+                      type="text" 
+                      value={businessName} 
+                      onChange={(e) => setBusinessName(e.target.value)} 
+                      style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--input-bg)', color: 'var(--text-primary)', fontWeight: 600 }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Current Billing Status Plan</label>
+                    <input 
+                      type="text" 
+                      readOnly 
+                      value={businessPlan} 
+                      style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)', fontWeight: 600, outline: 'none' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Usage Stats details */}
+              <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h3 className="analytics-card-title">Enterprise System Usage</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Leads limit:</span>
+                    <span style={{ fontWeight: 700 }}>{leads.length} / 10,000</span>
+                  </div>
+                  <div className="progress-track" style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div className="progress-bar" style={{ height: '100%', width: `${Math.min(100, Math.round((leads.length / 10000) * 100))}%`, background: 'var(--primary)' }}></div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>WhatsApp Messages Sent:</span>
+                    <span style={{ fontWeight: 700 }}>142 / 100,000</span>
+                  </div>
+                  <div className="progress-track" style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div className="progress-bar" style={{ height: '100%', width: '1%', background: 'var(--primary)' }}></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
