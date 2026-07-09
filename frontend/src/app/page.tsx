@@ -61,6 +61,93 @@ interface ImportSummary {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
+const CRM_FIELDS = [
+  { key: 'name', label: 'Lead Name', description: 'Full name of the lead' },
+  { key: 'email', label: 'Email Address', description: 'Primary email address' },
+  { key: 'mobile_without_country_code', label: 'Mobile Number', description: 'Phone number without country code' },
+  { key: 'country_code', label: 'Country Code', description: 'Phone country code (e.g. +91)' },
+  { key: 'created_at', label: 'Creation Date', description: 'Lead creation timestamp' },
+  { key: 'company', label: 'Company Name', description: 'Organization or employer' },
+  { key: 'city', label: 'City', description: 'City location' },
+  { key: 'state', label: 'State', description: 'State location' },
+  { key: 'country', label: 'Country', description: 'Country location' },
+  { key: 'lead_owner', label: 'Lead Owner', description: 'CRM owner email or name' },
+  { key: 'crm_status', label: 'CRM Status', description: 'Current standing of the lead' },
+  { key: 'crm_note', label: 'CRM Notes / Remarks', description: 'Consolidated comments and extra details' },
+  { key: 'data_source', label: 'Data Source', description: 'Campaign channel source' },
+  { key: 'possession_time', label: 'Possession Time', description: 'Property possession time' },
+  { key: 'description', label: 'Description', description: 'General description' }
+];
+
+const autoDetectMappings = (headers: string[]) => {
+  const detected: { [key: string]: string } = {};
+  
+  headers.forEach(header => {
+    const h = header.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    // Name mapping
+    if ((h === 'name' || h === 'fullname' || h === 'leadname' || h === 'customername' || h === 'first_name' || h === 'firstname') && !detected['name']) {
+      detected['name'] = header;
+    }
+    // Email mapping
+    else if ((h === 'email' || h === 'emailaddress' || h === 'mail' || h === 'primaryemail') && !detected['email']) {
+      detected['email'] = header;
+    }
+    // Mobile mapping
+    else if ((h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('number') || h.includes('tel')) && !h.includes('code') && !detected['mobile_without_country_code']) {
+      detected['mobile_without_country_code'] = header;
+    }
+    // Country code
+    else if ((h.includes('countrycode') || h.includes('phonecode') || h.includes('dialcode')) && !detected['country_code']) {
+      detected['country_code'] = header;
+    }
+    // Created at
+    else if ((h.includes('date') || h.includes('time') || h.includes('created') || h === 'timestamp') && h !== 'possessiontime' && !detected['created_at']) {
+      detected['created_at'] = header;
+    }
+    // Company
+    else if ((h.includes('company') || h.includes('organization') || h === 'org' || h === 'employer') && !detected['company']) {
+      detected['company'] = header;
+    }
+    // Location: City, State, Country
+    else if ((h === 'city' || h === 'town' || h === 'location') && !detected['city']) {
+      detected['city'] = header;
+    }
+    else if ((h === 'state' || h === 'region' || h === 'province') && !detected['state']) {
+      detected['state'] = header;
+    }
+    else if ((h === 'country' || h === 'nation') && !detected['country']) {
+      detected['country'] = header;
+    }
+    // Lead Owner
+    else if ((h.includes('owner') || h.includes('assignee') || h.includes('agent')) && !detected['lead_owner']) {
+      detected['lead_owner'] = header;
+    }
+    // CRM status
+    else if ((h.includes('status') || h.includes('stage') || h.includes('state')) && h !== 'state' && !detected['crm_status']) {
+      detected['crm_status'] = header;
+    }
+    // Notes
+    else if ((h.includes('note') || h.includes('remark') || h.includes('comment') || h.includes('feedback')) && !detected['crm_note']) {
+      detected['crm_note'] = header;
+    }
+    // Source
+    else if ((h.includes('source') || h.includes('campaign') || h.includes('medium') || h.includes('channel')) && !detected['data_source']) {
+      detected['data_source'] = header;
+    }
+    // Possession
+    else if ((h.includes('possession') || h.includes('possessiontime')) && !detected['possession_time']) {
+      detected['possession_time'] = header;
+    }
+    // Description
+    else if ((h.includes('desc') || h.includes('details') || h.includes('about')) && !detected['description']) {
+      detected['description'] = header;
+    }
+  });
+  
+  return detected;
+};
+
 export default function CSVImporterPage() {
   // Navigation States
   const [activeTab, setActiveTab] = useState<'sources' | 'leads'>('sources');
@@ -88,6 +175,7 @@ export default function CSVImporterPage() {
   
   // Leads Store
   const [leads, setLeads] = useState<MappedLead[]>([]);
+  const [mappings, setMappings] = useState<{ [key: string]: string }>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedLead, setSelectedLead] = useState<MappedLead | null>(null);
@@ -227,6 +315,11 @@ export default function CSVImporterPage() {
 
         setRawHeaders(headers);
         setRawRows(rows);
+
+        // Auto detect mappings
+        const initialMappings = autoDetectMappings(headers);
+        setMappings(initialMappings);
+
         setModalStep(2); // Go to Preview
       },
       error: (error) => {
@@ -267,6 +360,7 @@ export default function CSVImporterPage() {
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('mappings', JSON.stringify(mappings));
 
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
@@ -341,6 +435,7 @@ export default function CSVImporterPage() {
     setFile(null);
     setRawHeaders([]);
     setRawRows([]);
+    setMappings({});
     setMappedLeads([]);
     setSkippedLeads([]);
     setSummary(null);
@@ -895,6 +990,67 @@ export default function CSVImporterPage() {
                       Showing first 10 rows of raw preview...
                     </p>
                   )}
+
+                  {/* Column Mapping Section */}
+                  <div className="mapping-section">
+                    <div className="mapping-section-header">
+                      <div className="mapping-section-title">
+                        <Sparkles size={16} style={{ color: 'var(--primary)' }} />
+                        CRM Schema Field Mapping
+                      </div>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setMappings({});
+                        }}
+                        style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)' }}
+                      >
+                        Clear Mappings
+                      </button>
+                    </div>
+                    <p className="mapping-section-description">
+                      We've automatically matched your CSV headers to our CRM fields. Verify or adjust the selections below to ensure high mapping accuracy.
+                    </p>
+
+                    <div className="mapping-grid">
+                      {CRM_FIELDS.map((field) => {
+                        const isRequired = ['name', 'email', 'mobile_without_country_code'].includes(field.key);
+                        const isMapped = !!mappings[field.key];
+                        return (
+                          <div 
+                            key={field.key} 
+                            className={`mapping-item ${isMapped ? 'mapped' : ''} ${isRequired ? 'required' : ''}`}
+                          >
+                            <div className="mapping-label-row">
+                              <span className="mapping-label">{field.label}</span>
+                              <span className={`mapping-badge ${isRequired ? 'req' : 'opt'}`}>
+                                {isRequired ? 'Primary/Required' : 'Optional'}
+                              </span>
+                            </div>
+                            <span className="mapping-desc">{field.description}</span>
+                            <select
+                              className="mapping-select"
+                              value={mappings[field.key] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setMappings(prev => ({
+                                  ...prev,
+                                  [field.key]: val
+                                }));
+                              }}
+                            >
+                              <option value="">(Select column or skip)</option>
+                              {rawHeaders.map((header, hIdx) => (
+                                <option key={hIdx} value={header}>
+                                  {header}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
 

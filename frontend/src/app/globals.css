@@ -1360,3 +1360,127 @@ h1, h2, h3, h4, h5, h6 {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Column Mapping UI Styles */
+.mapping-section {
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 1.25rem;
+  text-align: left;
+}
+
+.mapping-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.mapping-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mapping-section-description {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+}
+
+/* Responsive grid for mapping */
+@media (max-width: 600px) {
+  .mapping-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mapping-item {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.6rem;
+  transition: border-color var(--transition-normal), background-color var(--transition-normal);
+}
+
+.mapping-item.mapped {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.02);
+}
+
+.mapping-item.required {
+  border-left: 3px solid var(--primary);
+}
+
+.mapping-item.required.mapped {
+  border-left: 3px solid var(--success);
+}
+
+.mapping-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.2rem;
+}
+
+.mapping-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mapping-badge {
+  font-size: 0.6rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--radius-full);
+  font-weight: 500;
+}
+
+.mapping-badge.req {
+  background: rgba(240, 133, 97, 0.1);
+  color: var(--primary);
+}
+
+.mapping-badge.opt {
+  background: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.mapping-desc {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+  line-height: 1.25;
+}
+
+.mapping-select {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.mapping-select:focus {
+  border-color: var(--primary);
+}
+

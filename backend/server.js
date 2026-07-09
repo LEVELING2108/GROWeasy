@@ -195,6 +195,16 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
 
     const rawRecords = parsed.data;
 
+    // Parse column mappings from the request body if present
+    let mappings = null;
+    if (req.body.mappings) {
+      try {
+        mappings = typeof req.body.mappings === 'string' ? JSON.parse(req.body.mappings) : req.body.mappings;
+      } catch (err) {
+        console.error('Failed to parse column mappings:', err);
+      }
+    }
+
     // Filter out records that are completely empty
     const validRawRecords = rawRecords.filter(row => {
       // Must have some data
@@ -213,32 +223,68 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
       let created_at = new Date().toISOString();
       let company = '';
       let city = '';
+      let state = '';
+      let country = 'India';
+      let lead_owner = 'owner@groweasy.ai';
       let data_source = '';
       let crm_status = 'GOOD_LEAD_FOLLOW_UP';
       let crm_note = '';
       let possession_time = '';
       let description = '';
 
+      // Helper to get directly mapped column values
+      const getMappedValue = (field, defaultVal = '') => {
+        if (mappings && mappings[field]) {
+          const csvColName = mappings[field];
+          if (row[csvColName] !== undefined && row[csvColName] !== null) {
+            return (row[csvColName] + '').trim();
+          }
+        }
+        return defaultVal;
+      };
+
+      name = getMappedValue('name', '');
+      email = getMappedValue('email', '');
+      phone = getMappedValue('mobile_without_country_code', '');
+      created_at = getMappedValue('created_at', '');
+      company = getMappedValue('company', '');
+      city = getMappedValue('city', '');
+      state = getMappedValue('state', '');
+      country = getMappedValue('country', 'India');
+      lead_owner = getMappedValue('lead_owner', 'owner@groweasy.ai');
+      data_source = getMappedValue('data_source', '');
+      crm_status = getMappedValue('crm_status', 'GOOD_LEAD_FOLLOW_UP');
+      crm_note = getMappedValue('crm_note', '');
+      possession_time = getMappedValue('possession_time', '');
+      description = getMappedValue('description', '');
+
+      // Apply regex fallbacks only for fields that were not directly resolved by the user's manual mapping
       for (const [key, value] of Object.entries(row)) {
         const k = key.toLowerCase();
         const v = (value || '').trim();
         if (!v) continue;
+
         if (k.includes('name') && !name) name = v;
         if (k.includes('email') && !email) email = v;
         if ((k.includes('phone') || k.includes('mobile') || k.includes('number') || k.includes('contact')) && !phone) phone = v;
-        if ((k.includes('date') || k.includes('time') || k.includes('created')) && k !== 'possession_time') created_at = v;
-        if (k.includes('company') || k.includes('org')) company = v;
-        if (k.includes('city') || k.includes('location')) city = v;
-        if (k.includes('campaign') || k.includes('source')) data_source = v;
-        if (k.includes('note') || k.includes('remark') || k.includes('comment')) crm_note = v;
-        if (k.includes('possession')) possession_time = v;
-        if (k.includes('desc')) description = v;
+        if ((k.includes('date') || k.includes('time') || k.includes('created')) && k !== 'possession_time' && (!created_at || created_at === new Date().toISOString())) created_at = v;
+        if ((k.includes('company') || k.includes('org')) && !company) company = v;
+        if ((k.includes('city') || k.includes('location')) && !city) city = v;
+        if ((k.includes('campaign') || k.includes('source')) && !data_source) data_source = v;
+        if ((k.includes('note') || k.includes('remark') || k.includes('comment')) && !crm_note) crm_note = v;
+        if (k.includes('possession') && !possession_time) possession_time = v;
+        if (k.includes('desc') && !description) description = v;
       }
 
-      // Clean phone
+      // Clean phone country code and main body
       let country_code = '+91';
       let mobile_without_country_code = phone;
-      if (phone && phone.trim().startsWith('+')) {
+
+      // Extract custom country code from mapped country_code column if provided
+      const mappedCountryCode = getMappedValue('country_code', '');
+      if (mappedCountryCode) {
+        country_code = mappedCountryCode;
+      } else if (phone && phone.trim().startsWith('+')) {
         const match = phone.match(/^(\+\d{1,3})\s*(.*)$/);
         if (match) {
           country_code = match[1];
@@ -272,16 +318,16 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
       }
 
       return {
-        created_at,
+        created_at: created_at || new Date().toISOString(),
         name: name || `Lead ${idx + 1}`,
         email: email || '',
         country_code,
         mobile_without_country_code: mobile_without_country_code || '',
         company: company || 'Company',
         city: city || 'City',
-        state: '',
-        country: 'India',
-        lead_owner: 'owner@groweasy.ai',
+        state: state || '',
+        country: country || 'India',
+        lead_owner: lead_owner || 'owner@groweasy.ai',
         crm_status,
         crm_note: crm_note,
         data_source: matchedSource || (allowedSources.includes(data_source) ? data_source : 'leads_on_demand'),
@@ -308,11 +354,26 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         skipped: validRawRecords.filter(row => {
           let email = '';
           let phone = '';
-          for (const [key, value] of Object.entries(row)) {
-            const k = key.toLowerCase();
-            if (k.includes('email')) email = value;
-            if (k.includes('phone') || k.includes('mobile') || k.includes('number')) phone = value;
+          
+          if (mappings && mappings.email) {
+            email = row[mappings.email];
           }
+          if (mappings && mappings.mobile_without_country_code) {
+            phone = row[mappings.mobile_without_country_code];
+          }
+          
+          // Fallback if not mapped
+          if (!email && (!mappings || !mappings.email)) {
+            for (const [key, value] of Object.entries(row)) {
+              if (key.toLowerCase().includes('email')) email = value;
+            }
+          }
+          if (!phone && (!mappings || !mappings.mobile_without_country_code)) {
+            for (const [key, value] of Object.entries(row)) {
+              if (key.toLowerCase().includes('phone') || key.toLowerCase().includes('mobile') || key.toLowerCase().includes('number')) phone = value;
+            }
+          }
+          
           return !email && !phone;
         }).map(row => ({ record: row, reason: 'Missing both email and phone number' }))
       });
@@ -327,10 +388,21 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
       const batch = batches[batchIndex];
       console.log(`Processing batch ${batchIndex + 1}/${batches.length}...`);
 
+      let mappingInstructions = '';
+      if (mappings) {
+        mappingInstructions = `
+CRITICAL: The user has specified the following column mappings for this spreadsheet:
+${Object.entries(mappings).filter(([_, val]) => !!val).map(([crmField, csvCol]) => `- CRM field "${crmField}" should be extracted from CSV column "${csvCol}"`).join('\n')}
+
+Please prioritize using these specified column mappings to populate the respective fields. If a field is not mapped, use your semantic analysis to determine if it should be extracted from other columns.
+`;
+      }
+
       const prompt = `
 Please map this batch of parsed CSV records into the standard CRM format.
 Here is the batch of raw records:
 ${JSON.stringify(batch, null, 2)}
+${mappingInstructions}
 
 Return ONLY a JSON array containing the mapped objects. Each object should have keys:
 "created_at", "name", "email", "country_code", "mobile_without_country_code", "company", "city", "state", "country", "lead_owner", "crm_status", "crm_note", "data_source", "possession_time", "description".
