@@ -152,7 +152,7 @@ const autoDetectMappings = (headers: string[]) => {
 
 export default function CSVImporterPage() {
   // Navigation States
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'sources' | 'leads'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'sources' | 'analytics' | 'leads'>('sources');
   
   // Importer Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -586,11 +586,18 @@ export default function CSVImporterPage() {
           <div className="sidebar-section-title">Main</div>
           <nav className="sidebar-nav">
             <div 
-              className={`sidebar-link ${activeTab === 'dashboard' ? 'active' : ''}`} 
-              onClick={() => setActiveTab('dashboard')}
+              className={`sidebar-link ${activeTab === 'sources' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('sources')}
             >
               <LayoutDashboard size={16} />
               <span>Dashboard</span>
+            </div>
+            <div 
+              className={`sidebar-link ${activeTab === 'analytics' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('analytics')}
+            >
+              <TrendingUp size={16} />
+              <span>Analytics</span>
             </div>
             <div className="sidebar-link">
               <Radio size={16} />
@@ -658,7 +665,7 @@ export default function CSVImporterPage() {
       <main className="main-viewport animate-slide-up">
         
         {/* VIEW 0: ANALYTICS DASHBOARD */}
-        {activeTab === 'dashboard' && (
+        {activeTab === 'analytics' && (
           <div>
             <div className="view-header" style={{ marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
