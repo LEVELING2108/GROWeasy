@@ -47,7 +47,26 @@ function loadLeadsFromDatabase() {
   try {
     if (fs.existsSync(dbPath)) {
       const data = fs.readFileSync(dbPath, 'utf8');
-      return JSON.parse(data);
+      const leads = JSON.parse(data);
+      if (Array.isArray(leads)) {
+        const allowedStatuses = ["GOOD_LEAD_FOLLOW_UP", "DID_NOT_CONNECT", "BAD_LEAD", "SALE_DONE"];
+        return leads.map(l => {
+          if (!l.crm_status || !allowedStatuses.includes(l.crm_status)) {
+            const checkString = ((l.crm_status || '') + ' ' + (l.crm_note || '')).trim().toLowerCase();
+            let resolvedStatus = 'GOOD_LEAD_FOLLOW_UP';
+            if (checkString.includes('busy') || checkString.includes('no answer') || checkString.includes('not connect') || checkString.includes('dialed') || checkString.includes('dial') || checkString.includes('unreachable')) {
+              resolvedStatus = 'DID_NOT_CONNECT';
+            } else if (checkString.includes('not interested') || checkString.includes('bad') || checkString.includes('wrong') || checkString.includes('junk') || checkString.includes('spam') || checkString.includes('trash') || checkString.includes('invalid')) {
+              resolvedStatus = 'BAD_LEAD';
+            } else if (checkString.includes('close') || checkString.includes('sold') || checkString.includes('won') || checkString.includes('done') || checkString.includes('convert') || checkString.includes('sale') || checkString.includes('complete')) {
+              resolvedStatus = 'SALE_DONE';
+            }
+            return { ...l, crm_status: resolvedStatus };
+          }
+          return l;
+        });
+      }
+      return leads;
     }
   } catch (err) {
     console.error('Failed to load leads database:', err);
@@ -297,15 +316,22 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         return null; // will be skipped
       }
 
-      // Validate crm_status classification dynamically from note/status if present
-      const noteLower = crm_note.toLowerCase();
-      if (noteLower.includes('busy') || noteLower.includes('no answer') || noteLower.includes('not connect')) {
-        crm_status = 'DID_NOT_CONNECT';
-      } else if (noteLower.includes('not interested') || noteLower.includes('bad') || noteLower.includes('wrong')) {
-        crm_status = 'BAD_LEAD';
-      } else if (noteLower.includes('close') || noteLower.includes('sold') || noteLower.includes('won') || noteLower.includes('done')) {
-        crm_status = 'SALE_DONE';
+      // Clean and normalize crm_status to one of the 4 allowed statuses
+      let resolvedStatus = 'GOOD_LEAD_FOLLOW_UP';
+      const rawStatusVal = (getMappedValue('crm_status', '') || crm_status || '').trim().toLowerCase();
+      const rawNoteVal = (crm_note || '').trim().toLowerCase();
+      
+      const checkString = rawStatusVal || rawNoteVal;
+      if (checkString.includes('busy') || checkString.includes('no answer') || checkString.includes('not connect') || checkString.includes('dialed') || checkString.includes('dial') || checkString.includes('unreachable')) {
+        resolvedStatus = 'DID_NOT_CONNECT';
+      } else if (checkString.includes('not interested') || checkString.includes('bad') || checkString.includes('wrong') || checkString.includes('junk') || checkString.includes('spam') || checkString.includes('trash') || checkString.includes('invalid')) {
+        resolvedStatus = 'BAD_LEAD';
+      } else if (checkString.includes('close') || checkString.includes('sold') || checkString.includes('won') || checkString.includes('done') || checkString.includes('convert') || checkString.includes('sale') || checkString.includes('complete')) {
+        resolvedStatus = 'SALE_DONE';
+      } else {
+        resolvedStatus = 'GOOD_LEAD_FOLLOW_UP';
       }
+      crm_status = resolvedStatus;
 
       // Enforce data source
       const allowedSources = ["leads_on_demand", "meridian_tower", "eden_park", "varah_swamy", "sarjapur_plots"];
