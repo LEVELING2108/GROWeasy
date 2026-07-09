@@ -23,7 +23,9 @@ import {
   Search,
   CheckSquare,
   Sun,
-  Moon
+  Moon,
+  Activity,
+  TrendingUp
 } from 'lucide-react';
 
 interface RawRow {
@@ -150,7 +152,7 @@ const autoDetectMappings = (headers: string[]) => {
 
 export default function CSVImporterPage() {
   // Navigation States
-  const [activeTab, setActiveTab] = useState<'sources' | 'leads'>('sources');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'sources' | 'leads'>('dashboard');
   
   // Importer Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -517,6 +519,39 @@ export default function CSVImporterPage() {
     return matchesSearch && matchesStatus;
   });
 
+  // Analytics Dashboard Calculations
+  const totalLeads = leads.length;
+  const saleDoneCount = leads.filter(l => l.crm_status === 'SALE_DONE').length;
+  const goodFollowUpCount = leads.filter(l => l.crm_status === 'GOOD_LEAD_FOLLOW_UP').length;
+  const didNotConnectCount = leads.filter(l => l.crm_status === 'DID_NOT_CONNECT').length;
+  const badLeadCount = leads.filter(l => l.crm_status === 'BAD_LEAD').length;
+
+  const conversionRate = totalLeads ? Math.round((saleDoneCount / totalLeads) * 100) : 0;
+  const goodLeadsRate = totalLeads ? Math.round((goodFollowUpCount / totalLeads) * 100) : 0;
+  const badLeadsRate = totalLeads ? Math.round((badLeadCount / totalLeads) * 100) : 0;
+
+  // Source attribution counts
+  const sourceAttribution = leads.reduce((acc: { [key: string]: number }, lead) => {
+    const src = lead.data_source || 'Unknown';
+    acc[src] = (acc[src] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Sorting sources to show top campaign sources
+  const sortedSources = Object.entries(sourceAttribution)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  // Contact health calculations
+  const bothContact = leads.filter(l => l.email && l.mobile_without_country_code).length;
+  const emailOnly = leads.filter(l => l.email && !l.mobile_without_country_code).length;
+  const phoneOnly = leads.filter(l => !l.email && l.mobile_without_country_code).length;
+  const contactIntegrity = {
+    both: totalLeads ? Math.round((bothContact / totalLeads) * 100) : 0,
+    emailOnly: totalLeads ? Math.round((emailOnly / totalLeads) * 100) : 0,
+    phoneOnly: totalLeads ? Math.round((phoneOnly / totalLeads) * 100) : 0,
+  };
+
   return (
     <div className="dashboard-layout">
       {/* Sidebar - Matching screenshot1 & screenshot3 */}
@@ -550,7 +585,10 @@ export default function CSVImporterPage() {
           {/* Navigation Section */}
           <div className="sidebar-section-title">Main</div>
           <nav className="sidebar-nav">
-            <div className="sidebar-link" onClick={() => setActiveTab('sources')}>
+            <div 
+              className={`sidebar-link ${activeTab === 'dashboard' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('dashboard')}
+            >
               <LayoutDashboard size={16} />
               <span>Dashboard</span>
             </div>
@@ -619,6 +657,278 @@ export default function CSVImporterPage() {
       {/* Main Content Area */}
       <main className="main-viewport animate-slide-up">
         
+        {/* VIEW 0: ANALYTICS DASHBOARD */}
+        {activeTab === 'dashboard' && (
+          <div>
+            <div className="view-header" style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <div>
+                  <h2 className="view-title">Dashboard Overview</h2>
+                  <p className="view-subtitle">Real-time pipeline analytics, lead conversion metrics, and acquisition health.</p>
+                </div>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={fetchLeads} 
+                  disabled={isRefreshing}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}
+                >
+                  <RefreshCw size={14} className={isRefreshing ? 'animate-spin-one' : ''} />
+                  Refresh Stats
+                </button>
+              </div>
+            </div>
+
+            {/* Aggregated Stats Cards */}
+            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+              <div className="stat-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', borderLeft: '4px solid var(--primary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total CRM Pipeline</span>
+                  <Users size={18} style={{ color: 'var(--primary)' }} />
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800 }}>{totalLeads}</div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Leads imported into local db</span>
+              </div>
+
+              <div className="stat-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', borderLeft: '4px solid var(--success)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Deal Conversion Rate</span>
+                  <TrendingUp size={18} style={{ color: 'var(--success)' }} />
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--success)' }}>{conversionRate}%</div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{saleDoneCount} leads won & closed</span>
+              </div>
+
+              <div className="stat-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', borderLeft: '4px solid var(--info)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Good Leads Ratio</span>
+                  <Activity size={18} style={{ color: 'var(--info)' }} />
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--info)' }}>{goodLeadsRate}%</div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{goodFollowUpCount} active warm/follow-ups</span>
+              </div>
+
+              <div className="stat-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', borderLeft: '4px solid var(--error)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bad Lead Rate</span>
+                  <AlertCircle size={18} style={{ color: 'var(--error)' }} />
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--error)' }}>{badLeadsRate}%</div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{badLeadCount} junk or spam leads</span>
+              </div>
+            </div>
+
+            {/* Analytics Grid */}
+            <div className="analytics-grid">
+              
+              {/* Card 1: Pipeline Stage Breakdown */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">
+                  <Activity size={16} style={{ color: 'var(--primary)' }} />
+                  Pipeline Stage Breakdown
+                </h3>
+                <div className="analytics-chart-container">
+                  <div className="chart-row">
+                    <div className="chart-header">
+                      <div className="chart-label">
+                        <div className="chart-bullet" style={{ background: 'var(--success)' }}></div>
+                        <span>Deals Won (SALE_DONE)</span>
+                      </div>
+                      <span className="chart-value">{saleDoneCount} ({totalLeads ? Math.round((saleDoneCount/totalLeads)*100) : 0}%)</span>
+                    </div>
+                    <div className="chart-bar-wrapper">
+                      <div className="chart-bar-fill" style={{ width: `${totalLeads ? (saleDoneCount/totalLeads)*100 : 0}%`, background: 'var(--success)' }}></div>
+                    </div>
+                  </div>
+
+                  <div className="chart-row">
+                    <div className="chart-header">
+                      <div className="chart-label">
+                        <div className="chart-bullet" style={{ background: 'var(--primary)' }}></div>
+                        <span>Good Lead Follow Up</span>
+                      </div>
+                      <span className="chart-value">{goodFollowUpCount} ({totalLeads ? Math.round((goodFollowUpCount/totalLeads)*100) : 0}%)</span>
+                    </div>
+                    <div className="chart-bar-wrapper">
+                      <div className="chart-bar-fill" style={{ width: `${totalLeads ? (goodFollowUpCount/totalLeads)*100 : 0}%`, background: 'var(--primary)' }}></div>
+                    </div>
+                  </div>
+
+                  <div className="chart-row">
+                    <div className="chart-header">
+                      <div className="chart-label">
+                        <div className="chart-bullet" style={{ background: 'var(--info)' }}></div>
+                        <span>Did Not Connect</span>
+                      </div>
+                      <span className="chart-value">{didNotConnectCount} ({totalLeads ? Math.round((didNotConnectCount/totalLeads)*100) : 0}%)</span>
+                    </div>
+                    <div className="chart-bar-wrapper">
+                      <div className="chart-bar-fill" style={{ width: `${totalLeads ? (didNotConnectCount/totalLeads)*100 : 0}%`, background: 'var(--info)' }}></div>
+                    </div>
+                  </div>
+
+                  <div className="chart-row">
+                    <div className="chart-header">
+                      <div className="chart-label">
+                        <div className="chart-bullet" style={{ background: 'var(--error)' }}></div>
+                        <span>Bad Lead (Junk/Uninterested)</span>
+                      </div>
+                      <span className="chart-value">{badLeadCount} ({totalLeads ? Math.round((badLeadCount/totalLeads)*100) : 0}%)</span>
+                    </div>
+                    <div className="chart-bar-wrapper">
+                      <div className="chart-bar-fill" style={{ width: `${totalLeads ? (badLeadCount/totalLeads)*100 : 0}%`, background: 'var(--error)' }}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Campaign Channel Attribution */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">
+                  <Database size={16} style={{ color: 'var(--primary)' }} />
+                  Campaign Channel Attribution
+                </h3>
+                <div className="analytics-chart-container">
+                  {totalLeads === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      No campaign data available. Import leads to view.
+                    </div>
+                  ) : (
+                    sortedSources.map(([source, count], idx) => {
+                      const colors = ['#f08561', '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6'];
+                      const color = colors[idx % colors.length];
+                      const percent = Math.round((count / totalLeads) * 100);
+                      return (
+                        <div className="chart-row" key={source}>
+                          <div className="chart-header">
+                            <div className="chart-label">
+                              <div className="chart-bullet" style={{ background: color }}></div>
+                              <span>{source === 'leads_on_demand' ? 'Leads On Demand' : source === 'meridian_tower' ? 'Meridian Tower' : source === 'eden_park' ? 'Eden Park' : source === 'varah_swamy' ? 'Varah Swamy' : source === 'sarjapur_plots' ? 'Sarjapur Plots' : source}</span>
+                            </div>
+                            <span className="chart-value">{count} ({percent}%)</span>
+                          </div>
+                          <div className="chart-bar-wrapper">
+                            <div className="chart-bar-fill" style={{ width: `${percent}%`, background: color }}></div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Card 3: Lead Contact Health Integrity */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">
+                  <CheckCircle size={16} style={{ color: 'var(--primary)' }} />
+                  Contact Integrity Rating
+                </h3>
+                <div className="analytics-chart-container">
+                  <div className="chart-row">
+                    <div className="chart-header">
+                      <div className="chart-label">
+                        <div className="chart-bullet" style={{ background: '#10b981' }}></div>
+                        <span>Complete Contact (Both Email & Mobile)</span>
+                      </div>
+                      <span className="chart-value">{bothContact} ({contactIntegrity.both}%)</span>
+                    </div>
+                    <div className="chart-bar-wrapper">
+                      <div className="chart-bar-fill" style={{ width: `${contactIntegrity.both}%`, background: '#10b981' }}></div>
+                    </div>
+                  </div>
+
+                  <div className="chart-row">
+                    <div className="chart-header">
+                      <div className="chart-label">
+                        <div className="chart-bullet" style={{ background: '#3b82f6' }}></div>
+                        <span>Email Address Only</span>
+                      </div>
+                      <span className="chart-value">{emailOnly} ({contactIntegrity.emailOnly}%)</span>
+                    </div>
+                    <div className="chart-bar-wrapper">
+                      <div className="chart-bar-fill" style={{ width: `${contactIntegrity.emailOnly}%`, background: '#3b82f6' }}></div>
+                    </div>
+                  </div>
+
+                  <div className="chart-row">
+                    <div className="chart-header">
+                      <div className="chart-label">
+                        <div className="chart-bullet" style={{ background: '#f59e0b' }}></div>
+                        <span>Mobile Number Only</span>
+                      </div>
+                      <span className="chart-value">{phoneOnly} ({contactIntegrity.phoneOnly}%)</span>
+                    </div>
+                    <div className="chart-bar-wrapper">
+                      <div className="chart-bar-fill" style={{ width: `${contactIntegrity.phoneOnly}%`, background: '#f59e0b' }}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 4: Recent Pipelines Activity */}
+              <div className="analytics-card">
+                <h3 className="analytics-card-title">
+                  <FileText size={16} style={{ color: 'var(--primary)' }} />
+                  Recent Lead Additions
+                </h3>
+                <div className="activity-list">
+                  {leads.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      No recent lead activity.
+                    </div>
+                  ) : (
+                    leads.slice(0, 5).map((lead, idx) => {
+                      const statusColors = {
+                        GOOD_LEAD_FOLLOW_UP: 'var(--status-good-bg)',
+                        SALE_DONE: 'var(--status-sale-bg)',
+                        DID_NOT_CONNECT: 'var(--status-not-dialed-bg)',
+                        BAD_LEAD: 'var(--status-bad-bg)'
+                      };
+                      const textColors = {
+                        GOOD_LEAD_FOLLOW_UP: 'var(--status-good-text)',
+                        SALE_DONE: 'var(--status-sale-text)',
+                        DID_NOT_CONNECT: 'var(--status-not-dialed-text)',
+                        BAD_LEAD: 'var(--status-bad-text)'
+                      };
+                      const statusLabel = {
+                        GOOD_LEAD_FOLLOW_UP: 'Follow Up',
+                        SALE_DONE: 'Deal Closed',
+                        DID_NOT_CONNECT: 'No Answer',
+                        BAD_LEAD: 'Bad Lead'
+                      };
+
+                      return (
+                        <div className="activity-item" key={idx}>
+                          <div className="activity-info">
+                            <span className="activity-name">{lead.name}</span>
+                            <span className="activity-meta">
+                              {lead.email || 'No Email'} • {lead.mobile_without_country_code ? `${lead.country_code || '+91'} ${lead.mobile_without_country_code}` : 'No Phone'}
+                            </span>
+                          </div>
+                          <div className="activity-badge-row">
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', background: 'var(--border-color)', padding: '0.15rem 0.4rem', borderRadius: 'var(--radius-sm)', fontWeight: 500 }}>
+                              {lead.data_source || 'Import'}
+                            </span>
+                            <span 
+                              className="activity-status-badge"
+                              style={{ 
+                                background: statusColors[lead.crm_status as keyof typeof statusColors] || 'var(--border-color)',
+                                color: textColors[lead.crm_status as keyof typeof textColors] || 'var(--text-primary)'
+                              }}
+                            >
+                              {statusLabel[lead.crm_status as keyof typeof statusLabel] || lead.crm_status}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
         {/* VIEW 1: LEAD SOURCES (screenshot1) */}
         {activeTab === 'sources' && (
           <div>
