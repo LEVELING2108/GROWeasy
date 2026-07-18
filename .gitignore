@@ -20,6 +20,8 @@ dist/
 # Local databases (contains PII)
 leads_db.json
 /backend/leads_db.json
+leads.db
+/backend/leads.db
 
 # IDEs and editors
 .idea/
