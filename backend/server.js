@@ -41,52 +41,225 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-const dbPath = path.join(__dirname, 'leads_db.json');
+const sqlite3 = require('sqlite3').verbose();
+const sqliteDbPath = process.env.NODE_ENV === 'test' ? ':memory:' : path.join(__dirname, 'leads.db');
+const db = new sqlite3.Database(sqliteDbPath);
 
-function loadLeadsFromDatabase() {
-  try {
-    if (fs.existsSync(dbPath)) {
-      const data = fs.readFileSync(dbPath, 'utf8');
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT,
+    name TEXT,
+    email TEXT,
+    country_code TEXT,
+    mobile_without_country_code TEXT,
+    company TEXT,
+    city TEXT,
+    state TEXT,
+    country TEXT,
+    lead_owner TEXT,
+    crm_status TEXT,
+    crm_note TEXT,
+    data_source TEXT,
+    possession_time TEXT,
+    description TEXT
+  )`);
+
+  const legacyDbPath = path.join(__dirname, 'leads_db.json');
+  if (fs.existsSync(legacyDbPath)) {
+    try {
+      const data = fs.readFileSync(legacyDbPath, 'utf8');
       const leads = JSON.parse(data);
-      if (Array.isArray(leads)) {
-        const allowedStatuses = ["GOOD_LEAD_FOLLOW_UP", "DID_NOT_CONNECT", "BAD_LEAD", "SALE_DONE"];
-        return leads.map(l => {
-          if (!l.crm_status || !allowedStatuses.includes(l.crm_status)) {
-            const checkString = ((l.crm_status || '') + ' ' + (l.crm_note || '')).trim().toLowerCase();
-            let resolvedStatus = 'GOOD_LEAD_FOLLOW_UP';
-            if (checkString.includes('busy') || checkString.includes('no answer') || checkString.includes('not connect') || checkString.includes('dialed') || checkString.includes('dial') || checkString.includes('unreachable')) {
-              resolvedStatus = 'DID_NOT_CONNECT';
-            } else if (checkString.includes('not interested') || checkString.includes('bad') || checkString.includes('wrong') || checkString.includes('junk') || checkString.includes('spam') || checkString.includes('trash') || checkString.includes('invalid')) {
-              resolvedStatus = 'BAD_LEAD';
-            } else if (checkString.includes('close') || checkString.includes('sold') || checkString.includes('won') || checkString.includes('done') || checkString.includes('convert') || checkString.includes('sale') || checkString.includes('complete')) {
-              resolvedStatus = 'SALE_DONE';
-            }
-            return { ...l, crm_status: resolvedStatus };
+      if (Array.isArray(leads) && leads.length > 0) {
+        db.get("SELECT COUNT(*) as count FROM leads", (err, row) => {
+          if (!err && row.count === 0) {
+            console.log("Migrating legacy leads_db.json to SQLite database...");
+            const stmt = db.prepare(`INSERT INTO leads (
+              created_at, name, email, country_code, mobile_without_country_code,
+              company, city, state, country, lead_owner, crm_status, crm_note,
+              data_source, possession_time, description
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+            const allowedStatuses = ["GOOD_LEAD_FOLLOW_UP", "DID_NOT_CONNECT", "BAD_LEAD", "SALE_DONE"];
+
+            leads.forEach(l => {
+              let status = l.crm_status || 'GOOD_LEAD_FOLLOW_UP';
+              if (!allowedStatuses.includes(status)) {
+                const checkString = ((l.crm_status || '') + ' ' + (l.crm_note || '')).trim().toLowerCase();
+                if (checkString.includes('busy') || checkString.includes('no answer') || checkString.includes('not connect') || checkString.includes('dialed') || checkString.includes('dial') || checkString.includes('unreachable')) {
+                  status = 'DID_NOT_CONNECT';
+                } else if (checkString.includes('not interested') || checkString.includes('bad') || checkString.includes('wrong') || checkString.includes('junk') || checkString.includes('spam') || checkString.includes('trash') || checkString.includes('invalid')) {
+                  status = 'BAD_LEAD';
+                } else if (checkString.includes('close') || checkString.includes('sold') || checkString.includes('won') || checkString.includes('done') || checkString.includes('convert') || checkString.includes('sale') || checkString.includes('complete')) {
+                  status = 'SALE_DONE';
+                }
+              }
+
+              stmt.run(
+                l.created_at || new Date().toISOString(),
+                l.name || '',
+                l.email || '',
+                l.country_code || '',
+                l.mobile_without_country_code || '',
+                l.company || '',
+                l.city || '',
+                l.state || '',
+                l.country || '',
+                l.lead_owner || '',
+                status,
+                l.crm_note || '',
+                l.data_source || '',
+                l.possession_time || '',
+                l.description || ''
+              );
+            });
+            stmt.finalize();
+            console.log(`Migrated ${leads.length} records successfully.`);
           }
-          return l;
         });
       }
-      return leads;
+    } catch (err) {
+      console.error("Failed to migrate legacy leads:", err);
     }
-  } catch (err) {
-    console.error('Failed to load leads database:', err);
   }
-  return [];
+});
+
+function loadLeadsFromDatabase() {
+  return new Promise((resolve) => {
+    db.all("SELECT * FROM leads ORDER BY id DESC", (err, rows) => {
+      if (err) {
+        console.error("Failed to load leads:", err);
+        resolve([]);
+      } else {
+        resolve(rows || []);
+      }
+    });
+  });
 }
 
-// Sequential write queue to prevent concurrent writes from clobbering each other
-let writeQueue = Promise.resolve();
-
-function saveLeadsToDatabase(leads) {
-  return new Promise((resolve, reject) => {
-    writeQueue = writeQueue.then(() => {
-      try {
-        fs.writeFileSync(dbPath, JSON.stringify(leads, null, 2), 'utf8');
-        resolve();
-      } catch (err) {
-        console.error('Failed to save leads database:', err);
-        reject(err);
+function getLeadsCount() {
+  return new Promise((resolve) => {
+    db.get("SELECT COUNT(*) as count FROM leads", (err, row) => {
+      if (err) {
+        console.error("Failed to count leads:", err);
+        resolve(0);
+      } else {
+        resolve(row ? row.count : 0);
       }
+    });
+  });
+}
+
+function insertLeads(newLeads) {
+  return new Promise((resolve, reject) => {
+    if (newLeads.length === 0) return resolve();
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+      const stmt = db.prepare(`INSERT INTO leads (
+        created_at, name, email, country_code, mobile_without_country_code,
+        company, city, state, country, lead_owner, crm_status, crm_note,
+        data_source, possession_time, description
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+      newLeads.forEach(l => {
+        stmt.run(
+          l.created_at,
+          l.name,
+          l.email,
+          l.country_code,
+          l.mobile_without_country_code,
+          l.company,
+          l.city,
+          l.state,
+          l.country,
+          l.lead_owner,
+          l.crm_status,
+          l.crm_note,
+          l.data_source,
+          l.possession_time,
+          l.description
+        );
+      });
+      stmt.finalize();
+      db.run("COMMIT", (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  });
+}
+
+function updateLeadStatus(email, mobile, crm_status) {
+  return new Promise((resolve, reject) => {
+    const valEmail = (email || '').trim().toLowerCase();
+    const valMobile = (mobile || '').trim();
+    let sql = "";
+    let params = [crm_status];
+    if (valEmail && valMobile) {
+      sql = "UPDATE leads SET crm_status = ? WHERE LOWER(email) = ? AND mobile_without_country_code = ?";
+      params.push(valEmail, valMobile);
+    } else if (valEmail) {
+      sql = "UPDATE leads SET crm_status = ? WHERE LOWER(email) = ?";
+      params.push(valEmail);
+    } else if (valMobile) {
+      sql = "UPDATE leads SET crm_status = ? WHERE mobile_without_country_code = ?";
+      params.push(valMobile);
+    } else {
+      return reject(new Error("No identifier provided"));
+    }
+    db.run(sql, params, function(err) {
+      if (err) reject(err);
+      else resolve(this.changes);
+    });
+  });
+}
+
+function updateLeadNote(email, mobile, crm_note) {
+  return new Promise((resolve, reject) => {
+    const valEmail = (email || '').trim().toLowerCase();
+    const valMobile = (mobile || '').trim();
+    let sql = "";
+    let params = [crm_note];
+    if (valEmail && valMobile) {
+      sql = "UPDATE leads SET crm_note = ? WHERE LOWER(email) = ? AND mobile_without_country_code = ?";
+      params.push(valEmail, valMobile);
+    } else if (valEmail) {
+      sql = "UPDATE leads SET crm_note = ? WHERE LOWER(email) = ?";
+      params.push(valEmail);
+    } else if (valMobile) {
+      sql = "UPDATE leads SET crm_note = ? WHERE mobile_without_country_code = ?";
+      params.push(valMobile);
+    } else {
+      return reject(new Error("No identifier provided"));
+    }
+    db.run(sql, params, function(err) {
+      if (err) reject(err);
+      else resolve(this.changes);
+    });
+  });
+}
+
+function deleteLead(email, mobile) {
+  return new Promise((resolve, reject) => {
+    const valEmail = (email || '').trim().toLowerCase();
+    const valMobile = (mobile || '').trim();
+    let sql = "";
+    let params = [];
+    if (valEmail && valMobile) {
+      sql = "DELETE FROM leads WHERE LOWER(email) = ? AND mobile_without_country_code = ?";
+      params.push(valEmail, valMobile);
+    } else if (valEmail) {
+      sql = "DELETE FROM leads WHERE LOWER(email) = ?";
+      params.push(valEmail);
+    } else if (valMobile) {
+      sql = "DELETE FROM leads WHERE mobile_without_country_code = ?";
+      params.push(valMobile);
+    } else {
+      return reject(new Error("No identifier provided"));
+    }
+    db.run(sql, params, function(err) {
+      if (err) reject(err);
+      else resolve(this.changes);
     });
   });
 }
@@ -107,12 +280,27 @@ function isLeadMatch(lead, email, mobile) {
   
   if (hasEmail && hasMobile) {
     return emailMatch && mobileMatch;
-  } else if (hasEmail) {
-    return emailMatch;
-  } else if (hasMobile) {
-    return mobileMatch;
   }
-  return false;
+  return hasEmail ? emailMatch : mobileMatch;
+}
+
+function checkIsDuplicate(newLead, existingLeads) {
+  return existingLeads.some(existing => {
+    const emailMatch = newLead.email && existing.email && 
+                       newLead.email.trim().toLowerCase() === existing.email.trim().toLowerCase();
+    const phoneMatch = newLead.mobile_without_country_code && existing.mobile_without_country_code && 
+                       newLead.mobile_without_country_code.trim() === existing.mobile_without_country_code.trim();
+    
+    if (emailMatch) return true;
+    
+    if (phoneMatch) {
+      const nameMatch = newLead.name && existing.name &&
+                        newLead.name.trim().toLowerCase() === existing.name.trim().toLowerCase();
+      return nameMatch || (!newLead.email && !existing.email);
+    }
+    
+    return false;
+  });
 }
 
 // Initialize Gemini API client
@@ -168,26 +356,26 @@ const batchArray = (array, size) => {
   return result;
 };
 
-// Helper to call Gemini with retry mechanism (Exponential backoff)
-const callGeminiWithRetry = async (prompt, systemInstruction, retries = 2, delayMs = 1000) => {
+const callGeminiWithRetry = async (prompt, systemInstruction) => {
+  const retries = 2;
+  let delayMs = 1000;
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
-      const response = await ai.models.generateContent({
+      return await ai.models.generateContent({
         model: 'gemini-2.0-flash',
         contents: prompt,
         config: {
-          systemInstruction: systemInstruction,
+          systemInstruction,
           responseMimeType: 'application/json',
         }
       });
-      return response;
     } catch (err) {
       if (attempt > retries) {
-        throw err; // Exhausted all retries
+        throw err;
       }
       console.warn(`Gemini API Call Attempt ${attempt} failed: ${err.message}. Retrying in ${delayMs}ms...`);
       await new Promise(resolve => setTimeout(resolve, delayMs));
-      delayMs *= 2; // Double the delay (exponential backoff)
+      delayMs *= 2;
     }
   }
 };
@@ -234,8 +422,7 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'CSV file contains no records' });
     }
 
-    // Helper function for simulated fallback mapping
-    const mapRecordSimulated = (row, idx, fallbackMode = false) => {
+    const mapRecordSimulated = (row, idx) => {
       let name = '';
       let email = '';
       let phone = '';
@@ -496,7 +683,7 @@ If any record is missing both email and phone, output it with name: null and ema
         console.warn(`Error in batch ${batchIndex + 1} (Failing back to simulated mapping):`, err.message);
         // Fallback mapping for this batch due to API issues
         batch.forEach((row, idx) => {
-          const simulatedRecord = mapRecordSimulated(row, batchIndex * 10 + idx, true);
+          const simulatedRecord = mapRecordSimulated(row, batchIndex * 10 + idx);
           if (simulatedRecord) {
             allMappedRecords.push(simulatedRecord);
           } else {
@@ -509,32 +696,14 @@ If any record is missing both email and phone, output it with name: null and ema
       }
     }
 
-    // Persist to local JSON file database with de-duplication
     let newlyImportedCount = 0;
     const uniqueNewRecords = [];
 
     try {
-      const existingLeads = loadLeadsFromDatabase();
+      const existingLeads = await loadLeadsFromDatabase();
       
       allMappedRecords.forEach(newLead => {
-        const isDuplicate = existingLeads.some(existing => {
-          const emailMatch = newLead.email && existing.email && 
-                             newLead.email.trim().toLowerCase() === existing.email.trim().toLowerCase();
-          const phoneMatch = newLead.mobile_without_country_code && existing.mobile_without_country_code && 
-                             newLead.mobile_without_country_code.trim() === existing.mobile_without_country_code.trim();
-          
-          // Match by email is direct duplicate
-          if (emailMatch) return true;
-          
-          // Match by phone is duplicate only if name also matches, or if both lack email
-          if (phoneMatch) {
-            const nameMatch = newLead.name && existing.name &&
-                              newLead.name.trim().toLowerCase() === existing.name.trim().toLowerCase();
-            return nameMatch || (!newLead.email && !existing.email);
-          }
-          
-          return false;
-        });
+        const isDuplicate = checkIsDuplicate(newLead, existingLeads);
         
         if (!isDuplicate) {
           uniqueNewRecords.push(newLead);
@@ -552,10 +721,8 @@ If any record is missing both email and phone, output it with name: null and ema
         }
       });
       
-      const combined = [...uniqueNewRecords, ...existingLeads];
-      await saveLeadsToDatabase(combined);
+      await insertLeads(uniqueNewRecords);
       
-      // Update the reference array in-place so client receives only the newly added records
       allMappedRecords.length = 0;
       allMappedRecords.push(...uniqueNewRecords);
       
@@ -583,11 +750,9 @@ If any record is missing both email and phone, output it with name: null and ema
   }
 });
 
-// Retrieve persisted leads from database
-// NOTE: Add authentication middleware here before deploying to production.
-app.get('/api/leads', (req, res) => {
+app.get('/api/leads', async (req, res) => {
   try {
-    const leads = loadLeadsFromDatabase();
+    const leads = await loadLeadsFromDatabase();
     res.json({
       success: true,
       count: leads.length,
@@ -624,26 +789,16 @@ app.post('/api/leads/update-status', async (req, res) => {
   }
 
   try {
-    const leads = loadLeadsFromDatabase();
-    const updated = leads.map(l => {
-      if (isLeadMatch(l, email, mobile_without_country_code)) {
-        return { ...l, crm_status };
-      }
-      return l;
-    });
-    await saveLeadsToDatabase(updated);
+    await updateLeadStatus(email, mobile_without_country_code, crm_status);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update lead status', details: err.message });
   }
 });
 
-// Update single lead note in database
-// NOTE: Add authentication middleware here before deploying to production.
 app.post('/api/leads/update-note', async (req, res) => {
   const { email, mobile_without_country_code, crm_note } = req.body;
 
-  // Validate types
   if (email !== undefined && typeof email !== 'string') {
     return res.status(400).json({ error: 'Email must be a string' });
   }
@@ -651,7 +806,6 @@ app.post('/api/leads/update-note', async (req, res) => {
     return res.status(400).json({ error: 'mobile_without_country_code must be a string' });
   }
 
-  // Validate non-empty identifiers to prevent matching empty fields
   const hasEmail = typeof email === 'string' && email.trim() !== '';
   const hasMobile = typeof mobile_without_country_code === 'string' && mobile_without_country_code.trim() !== '';
   if (!hasEmail && !hasMobile) {
@@ -663,26 +817,16 @@ app.post('/api/leads/update-note', async (req, res) => {
   }
 
   try {
-    const leads = loadLeadsFromDatabase();
-    const updated = leads.map(l => {
-      if (isLeadMatch(l, email, mobile_without_country_code)) {
-        return { ...l, crm_note };
-      }
-      return l;
-    });
-    await saveLeadsToDatabase(updated);
+    await updateLeadNote(email, mobile_without_country_code, crm_note);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update lead note', details: err.message });
   }
 });
 
-// Delete lead from database
-// NOTE: Add authentication middleware here before deploying to production.
 app.post('/api/leads/delete', async (req, res) => {
   const { email, mobile_without_country_code } = req.body;
 
-  // Validate types
   if (email !== undefined && typeof email !== 'string') {
     return res.status(400).json({ error: 'Email must be a string' });
   }
@@ -690,7 +834,6 @@ app.post('/api/leads/delete', async (req, res) => {
     return res.status(400).json({ error: 'mobile_without_country_code must be a string' });
   }
 
-  // Validate non-empty identifiers to prevent matching empty fields
   const hasEmail = typeof email === 'string' && email.trim() !== '';
   const hasMobile = typeof mobile_without_country_code === 'string' && mobile_without_country_code.trim() !== '';
   if (!hasEmail && !hasMobile) {
@@ -698,9 +841,7 @@ app.post('/api/leads/delete', async (req, res) => {
   }
 
   try {
-    const leads = loadLeadsFromDatabase();
-    const filtered = leads.filter(l => !isLeadMatch(l, email, mobile_without_country_code));
-    await saveLeadsToDatabase(filtered);
+    await deleteLead(email, mobile_without_country_code);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete lead', details: err.message });
@@ -720,7 +861,7 @@ app.post('/api/leads/generate', async (req, res) => {
     const states = ["Maharashtra", "Maharashtra", "Tamil Nadu", "Gujarat", "Telangana", "Karnataka", "Delhi", "West Bengal", "Uttar Pradesh", "Haryana"];
     
     const newLeads = [];
-    const existingLeads = loadLeadsFromDatabase();
+    const existingLeads = await loadLeadsFromDatabase();
     
     for (let i = 0; i < numCount; i++) {
       const fn = firstNames[Math.floor(Math.random() * firstNames.length)];
@@ -766,31 +907,16 @@ app.post('/api/leads/generate', async (req, res) => {
       });
     }
     
-    // Check de-duplication rules before adding generated leads
     const uniqueGeneratedLeads = [];
     newLeads.forEach(newLead => {
-      const isDuplicate = existingLeads.some(existing => {
-        const emailMatch = newLead.email && existing.email && 
-                           newLead.email.trim().toLowerCase() === existing.email.trim().toLowerCase();
-        const phoneMatch = newLead.mobile_without_country_code && existing.mobile_without_country_code && 
-                           newLead.mobile_without_country_code.trim() === existing.mobile_without_country_code.trim();
-        
-        if (emailMatch) return true;
-        if (phoneMatch) {
-          const nameMatch = newLead.name && existing.name &&
-                            newLead.name.trim().toLowerCase() === existing.name.trim().toLowerCase();
-          return nameMatch || (!newLead.email && !existing.email);
-        }
-        return false;
-      });
+      const isDuplicate = checkIsDuplicate(newLead, existingLeads);
       
       if (!isDuplicate) {
         uniqueGeneratedLeads.push(newLead);
       }
     });
     
-    const combined = [...uniqueGeneratedLeads, ...existingLeads];
-    await saveLeadsToDatabase(combined);
+    await insertLeads(uniqueGeneratedLeads);
     
     res.json({
       success: true,
@@ -803,14 +929,14 @@ app.post('/api/leads/generate', async (req, res) => {
   }
 });
 
-// Server status route
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   try {
+    const count = await getLeadsCount();
     res.json({ 
       status: 'ok', 
       ai_enabled: !!ai,
       mode: ai ? 'AI-powered' : 'Simulation Mode (No GEMINI_API_KEY)',
-      leadsCount: loadLeadsFromDatabase().length
+      leadsCount: count
     });
   } catch (err) {
     res.status(500).json({ error: 'Health check failed', details: err.message });
@@ -824,12 +950,16 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-// Export modules for unit testing
 if (process.env.NODE_ENV === 'test') {
   module.exports = {
     app,
     isLeadMatch,
+    checkIsDuplicate,
     loadLeadsFromDatabase,
-    saveLeadsToDatabase
+    insertLeads,
+    updateLeadStatus,
+    updateLeadNote,
+    deleteLead,
+    db
   };
 }
