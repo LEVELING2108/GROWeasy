@@ -31,18 +31,18 @@ An intelligent, AI-powered CSV importer built to standardize arbitrary CRM lead 
 - **Results view:** Shows total imported vs skipped lead counts, success records table, and skipped lead cards detailing reasons (e.g., missing contact details).
 - **Simulation Fallback Mode:** Operates out-of-the-box using deterministic matching if no Gemini API key is configured.
 - **Dark Mode Support:** Clean, modern, responsive glassmorphic dashboard theme with system preferences local storage sync.
-- **Persistent SQLite Database Integration:** High-performance, concurrent SQLite database storage replacing the original file-based JSON store. Supports clean transaction-safe writes, asynchronous SQL querying, and fully automated legacy JSON records migration on server startup.
+- **Production-Ready PostgreSQL Cloud Integration (Pure JS):** Powered by node-postgres (`pg`) in 100% pure JavaScript (zero native C++ build step, zero GLIBC deployment errors). Connects seamlessly to cloud PostgreSQL providers (Supabase, Neon, Render Postgres) with zero-config local memory fallback for offline development.
 
 ## Tech Stack
 - **Frontend:** Next.js 16 (App Router), React 19, TypeScript, Vanilla CSS, Lucide Icons, PapaParse.
 - **Backend:** Node.js, Express, Multer, `@google/genai` (Official Google Gemini SDK).
 - **AI:** Google Gemini (`gemini-2.0-flash`) in strict JSON schema mode.
-- **Database:** Local SQLite database file (`backend/leads.db`) with native transactional deduplication, direct SQL querying, and auto-migration for legacy databases.
+- **Database:** PostgreSQL (production via `DATABASE_URL` using `pg`) with fallback to local memory/file storage for offline development.
 
 ## Architecture
 ### High-level Flow
 ```text
-Upload CSV (Drag/Picker) ➔ Parse locally (PapaParse) ➔ Preview Table ➔ Confirm Upload ➔ Send to Express Backend ➔ Batch records (10 per batch) ➔ AI mapping (Gemini SDK) ➔ Post-process validation ➔ Deduplicate & Save (leads.db) ➔ Return JSON ➔ Display Results
+Upload CSV (Drag/Picker) ➔ Parse locally (PapaParse) ➔ Preview Table ➔ Confirm Upload ➔ Send to Express Backend ➔ Batch records (10 per batch) ➔ AI mapping (Gemini SDK) ➔ Post-process validation ➔ Deduplicate & Save (PostgreSQL / Fallback) ➔ Return JSON ➔ Display Results
 ```
 
 ### Folder Structure
@@ -50,9 +50,8 @@ Upload CSV (Drag/Picker) ➔ Parse locally (PapaParse) ➔ Preview Table ➔ Con
 GROWeasy/
 ├── backend/                   # Node.js Express backend
 │   ├── .env.example
-│   ├── leads.db               # Local SQLite database (Auto-initialized and migrated)
 │   ├── package.json
-│   ├── server.js              # Express app, Gemini configuration, API routing
+│   ├── server.js              # Express app, Gemini configuration, PostgreSQL API routing
 │   └── server.test.js         # Backend unit tests
 ├── frontend/                  # Next.js App Router frontend
 │   ├── public/
@@ -134,6 +133,7 @@ npm run dev
 ### 2. Required Environment Variables
 Configure the following inside `backend/.env`:
 * `PORT` (Default: `5000`)
+* `DATABASE_URL` (Optional: PostgreSQL connection string from Supabase / Neon / Render Postgres)
 * `GEMINI_API_KEY` (Your Google Gemini API Key)
 
 ### 3. How to get a Gemini API Key
@@ -147,9 +147,10 @@ Configure the following inside `backend/.env`:
 
 ### 1. Backend (Render)
 * We have configured a `render.yaml` Blueprint file at the root.
-* Includes `npm_config_build_from_source: true` automatically to ensure native compilation of `sqlite3` and avoid GLIBC runtime library mismatches.
+* Uses 100% pure JavaScript node-postgres (`pg`) for zero native compilation issues or GLIBC errors on Render Linux containers.
 * Log in to **Render**, select **Blueprints**, and connect your GitHub repository.
 * Set the environment variables:
+  * `DATABASE_URL`: Your PostgreSQL connection string (e.g., from Neon, Supabase, or Render Postgres).
   * `GEMINI_API_KEY`: Your Gemini API Key.
   * `FRONTEND_URL`: Your Vercel frontend URL (e.g. `https://your-app.vercel.app`).
 * Click **Apply** to deploy the service.

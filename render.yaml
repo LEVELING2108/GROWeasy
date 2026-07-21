@@ -9,8 +9,9 @@ services:
     envVars:
       - key: PORT
         value: 5000
-      - key: npm_config_build_from_source
-        value: true
+      - key: DATABASE_URL
+        sync: false
+        placeholder: "Enter your PostgreSQL connection string (e.g. from Supabase, Neon, or Render Postgres)"
       - key: GEMINI_API_KEY
         sync: false
         placeholder: "Enter your Google Gemini API key"

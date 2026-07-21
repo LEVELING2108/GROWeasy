@@ -41,61 +41,113 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-const sqlite3 = require('sqlite3').verbose();
-const sqliteDbPath = process.env.NODE_ENV === 'test' ? ':memory:' : path.join(__dirname, 'leads.db');
-const db = new sqlite3.Database(sqliteDbPath);
+const { Pool } = require('pg');
 
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS leads (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT,
-    name TEXT,
-    email TEXT,
-    country_code TEXT,
-    mobile_without_country_code TEXT,
-    company TEXT,
-    city TEXT,
-    state TEXT,
-    country TEXT,
-    lead_owner TEXT,
-    crm_status TEXT,
+let pool = null;
+if (process.env.DATABASE_URL) {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+
+  pool.query(`CREATE TABLE IF NOT EXISTS leads (
+    id SERIAL PRIMARY KEY,
+    created_at VARCHAR(255),
+    name VARCHAR(255),
+    email VARCHAR(255),
+    country_code VARCHAR(50),
+    mobile_without_country_code VARCHAR(100),
+    company VARCHAR(255),
+    city VARCHAR(255),
+    state VARCHAR(255),
+    country VARCHAR(255),
+    lead_owner VARCHAR(255),
+    crm_status VARCHAR(100),
     crm_note TEXT,
-    data_source TEXT,
-    possession_time TEXT,
+    data_source VARCHAR(255),
+    possession_time VARCHAR(255),
     description TEXT
-  )`);
+  )`).then(() => {
+    console.log("PostgreSQL leads table initialized successfully.");
+  }).catch(err => {
+    console.error("PostgreSQL initialization error:", err);
+  });
+} else {
+  console.log("No DATABASE_URL provided. Operating in local memory/file fallback mode.");
+}
 
-  const legacyDbPath = path.join(__dirname, 'leads_db.json');
-  if (fs.existsSync(legacyDbPath)) {
+// Local fallback store for offline development when DATABASE_URL is not set
+const localDbPath = path.join(__dirname, 'leads_db.json');
+let localLeads = [];
+
+function loadLocalFallbackLeads() {
+  if (fs.existsSync(localDbPath)) {
     try {
-      const data = fs.readFileSync(legacyDbPath, 'utf8');
+      const data = fs.readFileSync(localDbPath, 'utf8');
       const leads = JSON.parse(data);
-      if (Array.isArray(leads) && leads.length > 0) {
-        db.get("SELECT COUNT(*) as count FROM leads", (err, row) => {
-          if (!err && row.count === 0) {
-            console.log("Migrating legacy leads_db.json to SQLite database...");
-            const stmt = db.prepare(`INSERT INTO leads (
-              created_at, name, email, country_code, mobile_without_country_code,
-              company, city, state, country, lead_owner, crm_status, crm_note,
-              data_source, possession_time, description
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      if (Array.isArray(leads)) {
+        return leads;
+      }
+    } catch (e) {
+      console.error("Failed to load local fallback file:", e);
+    }
+  }
+  return [];
+}
 
-            const allowedStatuses = ["GOOD_LEAD_FOLLOW_UP", "DID_NOT_CONNECT", "BAD_LEAD", "SALE_DONE"];
+if (!pool) {
+  localLeads = loadLocalFallbackLeads();
+}
 
-            leads.forEach(l => {
-              let status = l.crm_status || 'GOOD_LEAD_FOLLOW_UP';
-              if (!allowedStatuses.includes(status)) {
-                const checkString = ((l.crm_status || '') + ' ' + (l.crm_note || '')).trim().toLowerCase();
-                if (checkString.includes('busy') || checkString.includes('no answer') || checkString.includes('not connect') || checkString.includes('dialed') || checkString.includes('dial') || checkString.includes('unreachable')) {
-                  status = 'DID_NOT_CONNECT';
-                } else if (checkString.includes('not interested') || checkString.includes('bad') || checkString.includes('wrong') || checkString.includes('junk') || checkString.includes('spam') || checkString.includes('trash') || checkString.includes('invalid')) {
-                  status = 'BAD_LEAD';
-                } else if (checkString.includes('close') || checkString.includes('sold') || checkString.includes('won') || checkString.includes('done') || checkString.includes('convert') || checkString.includes('sale') || checkString.includes('complete')) {
-                  status = 'SALE_DONE';
-                }
-              }
+function loadLeadsFromDatabase() {
+  return new Promise(async (resolve) => {
+    if (pool) {
+      try {
+        const res = await pool.query("SELECT * FROM leads ORDER BY id DESC");
+        resolve(res.rows || []);
+      } catch (err) {
+        console.error("PostgreSQL query error:", err);
+        resolve([]);
+      }
+    } else {
+      resolve(localLeads);
+    }
+  });
+}
 
-              stmt.run(
+function getLeadsCount() {
+  return new Promise(async (resolve) => {
+    if (pool) {
+      try {
+        const res = await pool.query("SELECT COUNT(*) as count FROM leads");
+        resolve(res.rows[0] ? parseInt(res.rows[0].count, 10) : 0);
+      } catch (err) {
+        console.error("PostgreSQL count error:", err);
+        resolve(0);
+      }
+    } else {
+      resolve(localLeads.length);
+    }
+  });
+}
+
+function insertLeads(newLeads) {
+  return new Promise(async (resolve, reject) => {
+    if (newLeads.length === 0) return resolve();
+
+    if (pool) {
+      try {
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          for (const l of newLeads) {
+            await client.query(
+              `INSERT INTO leads (
+                created_at, name, email, country_code, mobile_without_country_code,
+                company, city, state, country, lead_owner, crm_status, crm_note,
+                data_source, possession_time, description
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+              [
                 l.created_at || new Date().toISOString(),
                 l.name || '',
                 l.email || '',
@@ -106,161 +158,137 @@ db.serialize(() => {
                 l.state || '',
                 l.country || '',
                 l.lead_owner || '',
-                status,
+                l.crm_status || 'GOOD_LEAD_FOLLOW_UP',
                 l.crm_note || '',
                 l.data_source || '',
                 l.possession_time || '',
                 l.description || ''
-              );
-            });
-            stmt.finalize();
-            console.log(`Migrated ${leads.length} records successfully.`);
+              ]
+            );
           }
-        });
+          await client.query("COMMIT");
+          resolve();
+        } catch (e) {
+          await client.query("ROLLBACK");
+          reject(e);
+        } finally {
+          client.release();
+        }
+      } catch (err) {
+        reject(err);
       }
-    } catch (err) {
-      console.error("Failed to migrate legacy leads:", err);
+    } else {
+      localLeads.unshift(...newLeads);
+      try {
+        fs.writeFileSync(localDbPath, JSON.stringify(localLeads, null, 2), 'utf8');
+      } catch (e) {
+        console.error("Failed to update local fallback file:", e);
+      }
+      resolve();
     }
-  }
-});
-
-function loadLeadsFromDatabase() {
-  return new Promise((resolve) => {
-    db.all("SELECT * FROM leads ORDER BY id DESC", (err, rows) => {
-      if (err) {
-        console.error("Failed to load leads:", err);
-        resolve([]);
-      } else {
-        resolve(rows || []);
-      }
-    });
-  });
-}
-
-function getLeadsCount() {
-  return new Promise((resolve) => {
-    db.get("SELECT COUNT(*) as count FROM leads", (err, row) => {
-      if (err) {
-        console.error("Failed to count leads:", err);
-        resolve(0);
-      } else {
-        resolve(row ? row.count : 0);
-      }
-    });
-  });
-}
-
-function insertLeads(newLeads) {
-  return new Promise((resolve, reject) => {
-    if (newLeads.length === 0) return resolve();
-    db.serialize(() => {
-      db.run("BEGIN TRANSACTION");
-      const stmt = db.prepare(`INSERT INTO leads (
-        created_at, name, email, country_code, mobile_without_country_code,
-        company, city, state, country, lead_owner, crm_status, crm_note,
-        data_source, possession_time, description
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-
-      newLeads.forEach(l => {
-        stmt.run(
-          l.created_at,
-          l.name,
-          l.email,
-          l.country_code,
-          l.mobile_without_country_code,
-          l.company,
-          l.city,
-          l.state,
-          l.country,
-          l.lead_owner,
-          l.crm_status,
-          l.crm_note,
-          l.data_source,
-          l.possession_time,
-          l.description
-        );
-      });
-      stmt.finalize();
-      db.run("COMMIT", (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
   });
 }
 
 function updateLeadStatus(email, mobile, crm_status) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const valEmail = (email || '').trim().toLowerCase();
     const valMobile = (mobile || '').trim();
-    let sql = "";
-    let params = [crm_status];
-    if (valEmail && valMobile) {
-      sql = "UPDATE leads SET crm_status = ? WHERE LOWER(email) = ? AND mobile_without_country_code = ?";
-      params.push(valEmail, valMobile);
-    } else if (valEmail) {
-      sql = "UPDATE leads SET crm_status = ? WHERE LOWER(email) = ?";
-      params.push(valEmail);
-    } else if (valMobile) {
-      sql = "UPDATE leads SET crm_status = ? WHERE mobile_without_country_code = ?";
-      params.push(valMobile);
+
+    if (pool) {
+      try {
+        let res;
+        if (valEmail && valMobile) {
+          res = await pool.query("UPDATE leads SET crm_status = $1 WHERE LOWER(email) = $2 AND mobile_without_country_code = $3", [crm_status, valEmail, valMobile]);
+        } else if (valEmail) {
+          res = await pool.query("UPDATE leads SET crm_status = $1 WHERE LOWER(email) = $2", [crm_status, valEmail]);
+        } else if (valMobile) {
+          res = await pool.query("UPDATE leads SET crm_status = $1 WHERE mobile_without_country_code = $2", [crm_status, valMobile]);
+        } else {
+          return reject(new Error("No identifier provided"));
+        }
+        resolve(res.rowCount);
+      } catch (err) {
+        reject(err);
+      }
     } else {
-      return reject(new Error("No identifier provided"));
+      localLeads = localLeads.map(l => {
+        if (isLeadMatch(l, email, mobile)) {
+          return { ...l, crm_status };
+        }
+        return l;
+      });
+      try {
+        fs.writeFileSync(localDbPath, JSON.stringify(localLeads, null, 2), 'utf8');
+      } catch (e) {}
+      resolve(1);
     }
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
   });
 }
 
 function updateLeadNote(email, mobile, crm_note) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const valEmail = (email || '').trim().toLowerCase();
     const valMobile = (mobile || '').trim();
-    let sql = "";
-    let params = [crm_note];
-    if (valEmail && valMobile) {
-      sql = "UPDATE leads SET crm_note = ? WHERE LOWER(email) = ? AND mobile_without_country_code = ?";
-      params.push(valEmail, valMobile);
-    } else if (valEmail) {
-      sql = "UPDATE leads SET crm_note = ? WHERE LOWER(email) = ?";
-      params.push(valEmail);
-    } else if (valMobile) {
-      sql = "UPDATE leads SET crm_note = ? WHERE mobile_without_country_code = ?";
-      params.push(valMobile);
+
+    if (pool) {
+      try {
+        let res;
+        if (valEmail && valMobile) {
+          res = await pool.query("UPDATE leads SET crm_note = $1 WHERE LOWER(email) = $2 AND mobile_without_country_code = $3", [crm_note, valEmail, valMobile]);
+        } else if (valEmail) {
+          res = await pool.query("UPDATE leads SET crm_note = $1 WHERE LOWER(email) = $2", [crm_note, valEmail]);
+        } else if (valMobile) {
+          res = await pool.query("UPDATE leads SET crm_note = $1 WHERE mobile_without_country_code = $2", [crm_note, valMobile]);
+        } else {
+          return reject(new Error("No identifier provided"));
+        }
+        resolve(res.rowCount);
+      } catch (err) {
+        reject(err);
+      }
     } else {
-      return reject(new Error("No identifier provided"));
+      localLeads = localLeads.map(l => {
+        if (isLeadMatch(l, email, mobile)) {
+          return { ...l, crm_note };
+        }
+        return l;
+      });
+      try {
+        fs.writeFileSync(localDbPath, JSON.stringify(localLeads, null, 2), 'utf8');
+      } catch (e) {}
+      resolve(1);
     }
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
   });
 }
 
 function deleteLead(email, mobile) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const valEmail = (email || '').trim().toLowerCase();
     const valMobile = (mobile || '').trim();
-    let sql = "";
-    let params = [];
-    if (valEmail && valMobile) {
-      sql = "DELETE FROM leads WHERE LOWER(email) = ? AND mobile_without_country_code = ?";
-      params.push(valEmail, valMobile);
-    } else if (valEmail) {
-      sql = "DELETE FROM leads WHERE LOWER(email) = ?";
-      params.push(valEmail);
-    } else if (valMobile) {
-      sql = "DELETE FROM leads WHERE mobile_without_country_code = ?";
-      params.push(valMobile);
+
+    if (pool) {
+      try {
+        let res;
+        if (valEmail && valMobile) {
+          res = await pool.query("DELETE FROM leads WHERE LOWER(email) = $1 AND mobile_without_country_code = $2", [valEmail, valMobile]);
+        } else if (valEmail) {
+          res = await pool.query("DELETE FROM leads WHERE LOWER(email) = $1", [valEmail]);
+        } else if (valMobile) {
+          res = await pool.query("DELETE FROM leads WHERE mobile_without_country_code = $1", [valMobile]);
+        } else {
+          return reject(new Error("No identifier provided"));
+        }
+        resolve(res.rowCount);
+      } catch (err) {
+        reject(err);
+      }
     } else {
-      return reject(new Error("No identifier provided"));
+      localLeads = localLeads.filter(l => !isLeadMatch(l, email, mobile));
+      try {
+        fs.writeFileSync(localDbPath, JSON.stringify(localLeads, null, 2), 'utf8');
+      } catch (e) {}
+      resolve(1);
     }
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
   });
 }
 
@@ -960,6 +988,6 @@ if (process.env.NODE_ENV === 'test') {
     updateLeadStatus,
     updateLeadNote,
     deleteLead,
-    db
+    pool
   };
 }
