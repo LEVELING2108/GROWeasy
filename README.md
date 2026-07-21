@@ -146,7 +146,8 @@ Configure the following inside `backend/.env`:
 ## Deployment
 
 ### 1. Backend (Render)
-* We have configured a `render.yaml` file at the root.
+* We have configured a `render.yaml` Blueprint file at the root.
+* Includes `npm_config_build_from_source: true` automatically to ensure native compilation of `sqlite3` and avoid GLIBC runtime library mismatches.
 * Log in to **Render**, select **Blueprints**, and connect your GitHub repository.
 * Set the environment variables:
   * `GEMINI_API_KEY`: Your Gemini API Key.
