@@ -1,134 +1,135 @@
 /* Refined Light Theme Design System with Advanced Premium Animations & Responsive Scaling */
 
 :root {
-  --font-sans: var(--font-geist-sans), Inter, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), monospace;
+  --font-sans: Inter, var(--font-geist-sans), -apple-system, system-ui, sans-serif;
+  --font-mono: SFMono-Regular, var(--font-geist-mono), Consolas, monospace;
 
-  /* Colors - Clean White & Grey Light Mode */
-  --bg-main: #f8f9fc;
+  /* Stripe Design Tokens */
+  --bg-main: #f6f9fc;
   --bg-sidebar: #ffffff;
   --bg-surface: #ffffff;
-  --border-color: #e4e7eb;
+  --border-color: #e6ebf1;
   --border-color-hover: #cbd5e1;
 
-  --primary: #f08561; /* Coral/Peach primary color from screenshots */
-  --primary-hover: #e3744e;
+  --primary: #635bff; /* Stripe Iconic Indigo */
+  --primary-hover: #4b45e4;
+  --primary-gradient: linear-gradient(135deg, #635bff 0%, #a259ff 100%);
   --primary-text: #ffffff;
   
-  --accent: #10b981;
+  --accent: #00d4ff;
 
-  --text-primary: #1a1e26;
-  --text-secondary: #606877;
-  --text-muted: #9ba3b2;
+  --text-primary: #0a2540; /* Stripe Slate Navy */
+  --text-secondary: #425466;
+  --text-muted: #8898aa;
 
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --info: #3b82f6;
+  --success: #00d4b1;
+  --warning: #ffc72c;
+  --error: #ff5252;
+  --info: #635bff;
 
-  /* Theme-aware shadow variables */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-  --shadow-md: 0 4px 12px 0 rgba(0, 0, 0, 0.03);
-  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  /* Stripe Elevation Shadows */
+  --shadow-sm: 0 1px 3px rgba(50, 50, 93, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 6px rgba(50, 50, 93, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 13px 27px -5px rgba(50, 50, 93, 0.15), 0 8px 16px -8px rgba(0, 0, 0, 0.1);
   
-  --radius-sm: 4px;
+  --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 16px;
+  --radius-lg: 12px;
   --radius-full: 9999px;
   
-  --transition-fast: 0.1s ease;
-  --transition-normal: 0.2s ease;
+  --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Scrollbar variables */
-  --scrollbar-thumb-bg: rgba(0, 0, 0, 0.08);
-  --scrollbar-thumb-hover-bg: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-bg: rgba(99, 91, 255, 0.15);
+  --scrollbar-thumb-hover-bg: rgba(99, 91, 255, 0.3);
   --scrollbar-sidebar-thumb-bg: rgba(0, 0, 0, 0.06);
   --scrollbar-sidebar-thumb-hover-bg: rgba(0, 0, 0, 0.12);
 
   /* Modal overlay background */
-  --modal-overlay-bg: rgba(15, 23, 42, 0.4);
+  --modal-overlay-bg: rgba(10, 37, 64, 0.5);
   --modal-footer-bg: #ffffff;
 
   /* Component specific semantic variables */
-  --sidebar-link-hover-bg: #f1f5f9;
-  --sidebar-link-hover-text: var(--text-primary);
-  --sidebar-link-active-bg: #e2e8f0;
-  --sidebar-link-active-text: var(--text-primary);
+  --sidebar-link-hover-bg: #f8fafc;
+  --sidebar-link-hover-text: #635bff;
+  --sidebar-link-active-bg: #f0f0ff;
+  --sidebar-link-active-text: #635bff;
 
   --profile-card-bg: #f8fafc;
-  --profile-card-border: #f1f5f9;
-  --profile-avatar-bg: #e2e8f0;
-  --profile-avatar-text: #475569;
+  --profile-card-border: #e6ebf1;
+  --profile-avatar-bg: #635bff;
+  --profile-avatar-text: #ffffff;
 
   --badge-not-connected-bg: #f1f5f9;
-  --badge-not-connected-text: #64748b;
-  --badge-connected-bg: rgba(16, 185, 129, 0.1);
-  --badge-connected-text: #059669;
+  --badge-not-connected-text: #425466;
+  --badge-connected-bg: rgba(0, 212, 177, 0.12);
+  --badge-connected-text: #008770;
 
-  --table-header-bg: #fafbfc;
-  --table-row-hover-bg: #f8fafc;
+  --table-header-bg: #f8fafc;
+  --table-row-hover-bg: #f6f9fc;
 
   --btn-secondary-bg: #ffffff;
-  --btn-secondary-border: #cbd5e1;
-  --btn-secondary-text: var(--text-primary);
+  --btn-secondary-border: #e6ebf1;
+  --btn-secondary-text: #0a2540;
   --btn-secondary-hover-bg: #f8fafc;
 
   --btn-icon-bg: #ffffff;
-  --btn-icon-border: #cbd5e1;
+  --btn-icon-border: #e6ebf1;
   --btn-icon-text: var(--text-secondary);
   --btn-icon-hover-bg: #f1f5f9;
 
   --btn-cancel-bg: #ffffff;
-  --btn-cancel-border: var(--border-color-hover);
+  --btn-cancel-border: #e6ebf1;
   --btn-cancel-text: var(--text-primary);
   --btn-cancel-hover-bg: #f8fafc;
   --btn-cancel-hover-text: var(--text-primary);
 
   --input-bg: #ffffff;
-  --input-border: #cbd5e1;
+  --input-border: #e6ebf1;
 
-  --dropzone-bg: #fafbfd;
-  --dropzone-border: #cbd5e1;
-  --dropzone-hover-bg: #f7f9fc;
+  --dropzone-bg: #f8fafc;
+  --dropzone-border: #635bff;
+  --dropzone-hover-bg: #f0f0ff;
   --dropzone-icon-bg: #ffffff;
-  --dropzone-icon-border: #cbd5e1;
-  --dropzone-hint-bg: #f1f5f9;
+  --dropzone-icon-border: #e6ebf1;
+  --dropzone-hint-bg: #f0f0ff;
 
-  --file-block-bg: #f0f7f4;
-  --file-block-border: #d1ebd8;
-  --file-block-icon-color: #059669;
-  --file-block-name-color: #064e3b;
-  --file-block-size-color: #047857;
-  --file-block-remove-color: #047857;
-  --file-block-remove-hover-color: #064e3b;
+  --file-block-bg: #f0f0ff;
+  --file-block-border: #d4d4ff;
+  --file-block-icon-color: #635bff;
+  --file-block-name-color: #0a2540;
+  --file-block-size-color: #635bff;
+  --file-block-remove-color: #635bff;
+  --file-block-remove-hover-color: #4b45e4;
 
   --scanner-box-bg: #ffffff;
   --scanner-box-border: var(--border-color-hover);
-  --scanner-line-bg: #f1f5f9;
-  --mapping-complete-color: #059669;
+  --scanner-line-bg: #f0f0ff;
+  --mapping-complete-color: #008770;
   --log-box-bg: var(--bg-main);
   --log-box-border: var(--border-color);
 
-  /* Status Badges */
-  --status-good-bg: #ecfdf5;
-  --status-good-text: #059669;
-  --status-sale-bg: #eff6ff;
-  --status-sale-text: #2563eb;
+  /* Stripe Status Badges */
+  --status-good-bg: rgba(0, 212, 177, 0.12);
+  --status-good-text: #008770;
+  --status-sale-bg: rgba(99, 91, 255, 0.12);
+  --status-sale-text: #635bff;
   --status-not-dialed-bg: #f1f5f9;
-  --status-not-dialed-text: #64748b;
-  --status-bad-bg: #fef2f2;
-  --status-bad-text: #dc2626;
+  --status-not-dialed-text: #425466;
+  --status-bad-bg: rgba(255, 82, 82, 0.12);
+  --status-bad-text: #d32f2f;
 
   /* Theme-aware inline styles colors */
-  --text-muted-state: #64748b;
-  --promo-card-border: #ff7a59;
-  --promo-card-bg: rgba(255, 122, 89, 0.01);
-  --success-tint-bg: rgba(16, 185, 129, 0.08);
-  --success-tint-border: rgba(16, 185, 129, 0.2);
-  --success-text: #10b981;
-  --error-tint-bg: rgba(239, 68, 68, 0.08);
-  --error-tint-border: rgba(239, 68, 68, 0.2);
-  --error-text: #ef4444;
+  --text-muted-state: #8898aa;
+  --promo-card-border: #635bff;
+  --promo-card-bg: rgba(99, 91, 255, 0.03);
+  --success-tint-bg: rgba(0, 212, 177, 0.1);
+  --success-tint-border: rgba(0, 212, 177, 0.25);
+  --success-text: #008770;
+  --error-tint-bg: rgba(255, 82, 82, 0.1);
+  --error-tint-border: rgba(255, 82, 82, 0.25);
+  --error-text: #d32f2f;
 }
 
 /* Base resets & utilities */
@@ -618,47 +619,33 @@ h1, h2, h3, h4, h5, h6 {
   outline: none;
 }
 
-.btn-primary {
-  background-color: var(--primary);
+.btn-primary, .btn-confirm {
+  background: linear-gradient(180deg, #635bff 0%, #4b45e4 100%);
   color: var(--primary-text);
-  border: 1px solid var(--primary);
+  border: 1px solid rgba(10, 37, 64, 0.1);
+  box-shadow: 0 2px 5px rgba(50, 50, 93, 0.1), 0 1px 1px rgba(0, 0, 0, 0.07);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.btn-primary:hover {
-  background-color: var(--primary-hover);
-  border-color: var(--primary-hover);
+.btn-primary:hover, .btn-confirm:hover {
+  background: linear-gradient(180deg, #7a73ff 0%, #5d56f5 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(99, 91, 255, 0.3), 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.btn-secondary {
+.btn-secondary, .btn-cancel {
   background-color: var(--btn-secondary-bg);
   border: 1px solid var(--btn-secondary-border);
   color: var(--btn-secondary-text);
+  box-shadow: 0 1px 3px rgba(50, 50, 93, 0.05);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover, .btn-cancel:hover {
   background-color: var(--btn-secondary-hover-bg);
-}
-
-.btn-cancel {
-  background-color: var(--btn-cancel-bg);
-  color: var(--btn-cancel-text);
-  border: 1px solid var(--btn-cancel-border);
-}
-
-.btn-cancel:hover {
-  background-color: var(--btn-cancel-hover-bg);
-  color: var(--btn-cancel-hover-text);
-}
-
-.btn-confirm {
-  background-color: var(--primary);
-  color: var(--primary-text);
-  border: 1px solid var(--primary);
-}
-
-.btn-confirm:hover {
-  background-color: var(--primary-hover);
-  border-color: var(--primary-hover);
+  border-color: var(--border-color-hover);
+  color: #635bff;
+  box-shadow: 0 3px 6px rgba(50, 50, 93, 0.08);
 }
 
 .modal-footer button {
